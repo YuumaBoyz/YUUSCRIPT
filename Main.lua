@@ -1,6 +1,6 @@
--- [[ 🛡️ YUUSCRIPT V3.0 - SYSTEME INTEGRAL COMPLET ]] --
+-- [[ 💎 YUUSCRIPT V3.0 - FUSION FINALE ]] --
 
--- **1. CHARGEMENT DES DÉPENDANCES ET MANAGERS**
+-- **1. CHARGEMENT DES DÉPENDANCES**
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
@@ -22,7 +22,7 @@ local HttpService = game:GetService("HttpService")
 local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
 -- **3. SECURISATION INTERFACE (Fix : image_1e54ff.jpg)**
-local pGui = Player:WaitForChild("PlayerGui", 20)
+local pGui = Player:WaitForChild("PlayerGui", 30)
 local mainGui = pGui:WaitForChild("Main", 20) 
 
 -- **4. FONCTIONS TECHNIQUES (Fix : Text is not a valid member of Frame)**
@@ -39,7 +39,8 @@ local function IsQuestActive()
     return false
 end
 
--- **5. MOTEUR AUTO-STATS**
+-- **5. MOTEURS DE FOND (Stats, Sniper, ESP)**
+-- Auto-Stats
 task.spawn(function()
     while task.wait(1) do
         if _G.AutoStats then
@@ -53,7 +54,7 @@ task.spawn(function()
     end
 end)
 
--- **6. MOTEUR FRUIT SNIPER & ESP**
+-- Fruit Sniper & ESP
 local function CreateESP(part, name)
     if part:FindFirstChild("YuuESP") then return end
     local bbg = Instance.new("BillboardGui", part)
@@ -69,7 +70,26 @@ local function CreateESP(part, name)
     lbl.TextScaled = true
 end
 
--- **7. LOGIQUE D'AUTOFARM**
+task.spawn(function()
+    while task.wait(1) do
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Tool") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
+                if _G.InstantSniper then
+                    local char = Player.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        root.CFrame = obj.Handle.CFrame
+                        firetouchinterest(root, obj.Handle, 0)
+                        firetouchinterest(root, obj.Handle, 1)
+                    end
+                end
+                if _G.FruitESP then CreateESP(obj.Handle, obj.Name) end
+            end
+        end
+    end
+end)
+
+-- **6. LOGIQUE D'AUTOFARM**
 _G.QuestsData = {
     {Level = 0, NPC = "Bandit Quest Giver", Name = "BanditQuest1", Mob = "Bandit", QuestID = 1, Pos = CFrame.new(1059, 16, 1549)},
     {Level = 10, NPC = "Adventurer", Name = "JungleQuest", Mob = "Monkey", QuestID = 1, Pos = CFrame.new(-1610, 37, 153)},
@@ -124,9 +144,9 @@ local function StartFarmLoop()
     end)
 end
 
--- **8. CRÉATION DE L'INTERFACE (GUI)**
+-- **7. CRÉATION DE L'INTERFACE (GUI)**
 local Window = Fluent:CreateWindow({
-    Title = "YUUSCRIPT V3.0", SubTitle = "Full Unlocked Edition",
+    Title = "YUUSCRIPT V3.0", SubTitle = "Ultimate Edition (Fix)",
     TabWidth = 160, Size = UDim2.fromOffset(580, 520), Acrylic = true, Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl
 })
@@ -139,6 +159,8 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
+local Options = Fluent.Options
+
 -- [[ TAB : AUTOFARM ]] --
 Tabs.Main:AddDropdown("Weapon", {
     Title = "Arme à utiliser", Values = {"Combat", "Saber", "Pipe", "Katana", "Cutlass"},
@@ -146,7 +168,7 @@ Tabs.Main:AddDropdown("Weapon", {
 })
 
 Tabs.Main:AddToggle("FarmToggle", {Title = "Activer l'Autofarm", Default = false}):OnChanged(function()
-    _G.AutoFarmEnabled = Fluent.Options.FarmToggle.Value
+    _G.AutoFarmEnabled = Options.FarmToggle.Value
     if _G.AutoFarmEnabled then StartFarmLoop() end
 end)
 
@@ -156,22 +178,22 @@ Tabs.Stats:AddDropdown("StatTarget", {
     Default = "Melee", Callback = function(v) _G.StatsTarget = v end
 })
 
-Tabs.Stats:AddToggle("StatsToggle", {Title = "Auto-Stats (Points illimités)", Default = false}):OnChanged(function()
-    _G.AutoStats = Fluent.Options.StatsToggle.Value
+Tabs.Stats:AddToggle("StatsToggle", {Title = "Auto-Stats", Default = false}):OnChanged(function()
+    _G.AutoStats = Options.StatsToggle.Value
 end)
 
 -- [[ TAB : FRUITS ]] --
 Tabs.Fruits:AddToggle("SniperToggle", {Title = "Fruit Sniper (Instant TP)", Default = false}):OnChanged(function()
-    _G.InstantSniper = Fluent.Options.SniperToggle.Value
+    _G.InstantSniper = Options.SniperToggle.Value
 end)
 
 Tabs.Fruits:AddToggle("ESPToggle", {Title = "ESP Fruits", Default = false}):OnChanged(function()
-    _G.FruitESP = Fluent.Options.ESPToggle.Value
+    _G.FruitESP = Options.ESPToggle.Value
 end)
 
 -- [[ TAB : MISC ]] --
 Tabs.Misc:AddButton({
-    Title = "Server Hop", Description = "Change de serveur pour trouver des boss/fruits",
+    Title = "Server Hop", Description = "Change de serveur",
     Callback = function()
         local Servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
         for _, s in pairs(Servers.data) do
@@ -202,28 +224,7 @@ Tabs.Settings:AddButton({
     end
 })
 
--- **9. INITIALISATION DES BOUCLES DE FOND**
-task.spawn(function()
-    while task.wait(1) do
-        for _, obj in pairs(workspace:GetChildren()) do
-            if obj:IsA("Tool") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
-                -- Sniper
-                if _G.InstantSniper then
-                    local char = Player.Character
-                    local root = char and char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.CFrame = obj.Handle.CFrame
-                        firetouchinterest(root, obj.Handle, 0)
-                        firetouchinterest(root, obj.Handle, 1)
-                    end
-                end
-                -- ESP
-                if _G.FruitESP then CreateESP(obj.Handle, obj.Name) end
-            end
-        end
-    end
-end)
-
+-- **8. INITIALISATION FINALE**
 if _G.AntiAFK then
     Player.Idled:Connect(function()
         VirtualUser:CaptureController()
@@ -233,4 +234,4 @@ end
 
 SaveManager:LoadAutoloadConfig()
 Window:SelectTab(1)
-Fluent:Notify({Title = "YUUSCRIPT V3.0", Content = "🚀 Interface intégrale chargée !", Duration = 5})
+Fluent:Notify({Title = "YUUSCRIPT V3.0", Content = "🚀 Système intégral et sécurisé chargé !", Duration = 5})
