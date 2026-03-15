@@ -10,10 +10,16 @@ local modules = {
     {name = "Système Visuel", file = "Visuals.lua"}
 }
 
--- ⚙️ Configuration Globale
-_G.SelectedWeapon = "Combat"
-_G.TweenSpeed = 300
+-- **⚙️ CONFIGURATION GLOBALE V3.0**
 _G.AutoFarmEnabled = false
+_G.InstantSniper = false
+_G.SelectedWeapon = "Combat"
+_G.AutoStats = false
+_G.StatsTarget = "Melee"
+_G.FruitESP = false
+_G.AntiAFK = true
+_G.AutoAttackEnabled = false -- Fix : Indispensable pour le démarrage
+_G.FastAttackSpeed = 0.05    -- Fix : Valeur par défaut
 _G.YuuLoaded = false
 
 -- 🛠️ Fonction de chargement avec tentative de secours (Retry Logic)
@@ -32,9 +38,14 @@ local function safeLoad(fileName, displayName)
         if success and content then
             local func, err = loadstring(content)
             if func then
-                result = func()
-                print("✅ [LOADER] : " .. displayName .. " chargé avec succès.")
-                return result
+                -- On passe le script dans un environnement sécurisé
+                local s, res = pcall(func)
+                if s then
+                    print("✅ [LOADER] : " .. displayName .. " chargé.")
+                    return res
+                else
+                    warn("❌ [RUNTIME ERROR] : " .. displayName .. " -> " .. tostring(res))
+                end
             else
                 warn("❌ [ERREUR SCRIPT] : " .. displayName .. " -> " .. tostring(err))
             end
@@ -47,21 +58,22 @@ local function safeLoad(fileName, displayName)
     return nil
 end
 
--- 🚀 Lancement du processus de chargement
+-- 🚀 Lancement du processus
 print("-----------------------------------------")
-print("🔥 YUUSCRIPT INITIALISATION...")
+print("🔥 YUUSCRIPT V3.0 INITIALISATION...")
 print("-----------------------------------------")
 
--- 1. On attend que le jeu soit prêt (Fix : image_1e54ff.jpg)
+-- 1. Attente du jeu et de l'UI (Fix : image_1e54ff.jpg)
 if not game:IsLoaded() then game.Loaded:Wait() end
 local Player = game:GetService("Players").LocalPlayer
-Player:WaitForChild("PlayerGui"):WaitForChild("Main", 20)
+local pGui = Player:WaitForChild("PlayerGui", 30)
+pGui:WaitForChild("Main", 20) -- On attend l'interface de Blox Fruits
 
 -- 2. Chargement séquentiel
 for _, module in ipairs(modules) do
     local loaded = safeLoad(module.file, module.name)
     
-    -- Assignation aux variables globales pour l'accès inter-scripts
+    -- Assignation sécurisée pour accès inter-scripts
     if module.file == "TweenModule.lua" then _G.TweenModule = loaded
     elseif module.file == "FastAttack.lua" then _G.FastAttack = loaded
     elseif module.file == "Autofarm.lua" then _G.Autofarm = loaded
@@ -70,23 +82,28 @@ for _, module in ipairs(modules) do
     end
 end
 
--- 3. Initialisation des moteurs
+-- 3. Activation de l'Anti-AFK (Intégré au Loader)
+if _G.AntiAFK then
+    local VirtualUser = game:GetService("VirtualUser")
+    Player.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+    print("💤 [YUUSCRIPT] : Anti-AFK activé.")
+end
+
+-- 4. Initialisation finale
 task.spawn(function()
-    if _G.FastAttack and _G.FastAttack.Start then
-        _G.FastAttack.Start()
-        print("⚡ [YUUSCRIPT] : FastAttack activé.")
-    end
-    
     _G.YuuLoaded = true
     print("-----------------------------------------")
     print("✨ [YUUSCRIPT] : TOUS LES SYSTÈMES SONT PRÊTS.")
     print("-----------------------------------------")
 end)
 
--- Notification visuelle
+-- Notification visuelle stylisée
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "YUUSCRIPT V3.0",
-    Text = "Système chargé. Appuie sur [R-CTRL] pour le menu.",
+    Title = "💎 YUUSCRIPT V3.0",
+    Text = "Système Fusion Finale chargé ! Bonne aventure.",
     Icon = "rbxassetid://6034509993",
-    Duration = 10
+    Duration = 8
 })
