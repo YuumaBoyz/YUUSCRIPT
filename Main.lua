@@ -3,12 +3,14 @@ local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/d
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 -- [[ CONFIGURATION INITIALE ]] --
-_G.TweenSpeed = 100
+_G.TweenSpeed = 300 -- Vitesse optimisée
 _G.AutoFarmEnabled = false
 _G.SniperEnabled = false
 _G.FruitESP = false
 _G.AntiAFK = true
-_G.SelectedWeapon = "Combat" -- Valeur par défaut logicielle
+_G.BypassGates = true -- Nouveau
+_G.SafeMode = false    -- Nouveau (Arrêt si Admin/Hunter proche)
+_G.SelectedWeapon = "Combat"
 
 -- [[ FONCTION SERVER HOP ]] --
 local function ServerHop()
@@ -36,10 +38,10 @@ end
 
 -- [[ CRÉATION DE LA FENÊTRE ]] --
 local Window = Fluent:CreateWindow({
-    Title = "YUUSCRIPT 🚀",
-    SubTitle = "By YUUMA - Blox Fruits Edition",
+    Title = "YUUSCRIPT 🚀 V3.0",
+    SubTitle = "By YUUMA - Ultimate Blox Fruits",
     TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
+    Size = UDim2.fromOffset(580, 520), -- Légèrement plus grand pour les nouvelles options
     Acrylic = true,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl
@@ -58,15 +60,15 @@ local Options = Fluent.Options
 
 -- [[ 1. SECTION AUTOFARM ]] --
 Tabs.Main:AddParagraph({
-    Title = "Gestion du Farm",
-    Content = "Progression automatique et intelligente."
+    Title = "Gestion du Farm Sea 1",
+    Content = "Le farm utilise désormais le système de Bypass Gates."
 })
 
--- SÉLECTEUR D'ARME (Placé avant le bouton Start pour la logique)
-Tabs.Main:AddDropdown("WeaponDropdown", {
+-- SÉLECTEUR D'ARME AMÉLIORÉ
+local WeaponDropdown = Tabs.Main:AddDropdown("WeaponDropdown", {
     Title = "Arme à utiliser",
-    Description = "Sélectionne l'arme à équiper automatiquement.",
-    Values = {"Combat", "Saber", "Pipe", "Katana", "Cutlass", "Dual Katana", "Iron Mace"},
+    Description = "L'arme sera équipée automatiquement avant chaque combat.",
+    Values = {"Combat", "Saber", "Pipe", "Katana", "Cutlass", "Dual Katana", "Iron Mace", "Soul Cane", "Bisentor"},
     Default = "Combat",
     Callback = function(Value)
         _G.SelectedWeapon = Value
@@ -79,19 +81,19 @@ FarmToggle:OnChanged(function()
     _G.AutoFarmEnabled = Options.AutoFarm.Value
     if _G.AutoFarmEnabled then
         task.spawn(function()
-            if _G.Autofarm then
-                _G.Autofarm.Start() 
+            if _G.AutofarmPro then
+                _G.AutofarmPro.Start() 
             else
-                Fluent:Notify({Title = "Erreur", Content = "Module Autofarm non chargé !"})
+                Fluent:Notify({Title = "⚠️ Erreur", Content = "Module Autofarm Pro (Sea 1) non détecté !"})
             end
         end)
     end
 end)
 
 Tabs.Main:AddSlider("TweenSpeed", {
-    Title = "Vitesse de Déplacement",
-    Description = "Ajuste la vitesse du Tween (80-150 recommandé).",
-    Default = 100,
+    Title = "Vitesse de Vol",
+    Description = "300 recommandé pour la Sea 1.",
+    Default = 300,
     Min = 50,
     Max = 800,
     Rounding = 1,
@@ -100,10 +102,36 @@ Tabs.Main:AddSlider("TweenSpeed", {
     end
 })
 
+-- NOUVELLE SECTION PHYSIQUE
+Tabs.Main:AddParagraph({ Title = "Options de Physique" })
+
+Tabs.Main:AddToggle("BypassGates", {Title = "Bypass Gates (Traverser Portes)", Default = true}):OnChanged(function(v)
+    _G.BypassGates = v
+end)
+
+Tabs.Main:AddToggle("SafeMode", {Title = "Safe Mode (Anti-Admin/Bounty)", Default = false}):OnChanged(function(v)
+    _G.SafeMode = v
+    if v then
+        task.spawn(function()
+            while _G.SafeMode do
+                for _, p in pairs(game.Players:GetPlayers()) do
+                    if p ~= game.Players.LocalPlayer and p:GetRoleInGroup(2830838) ~= "Guest" then -- Détecte les staffs
+                        _G.AutoFarmEnabled = false
+                        Options.AutoFarm:SetValue(false)
+                        Fluent:Notify({Title = "🚨 ALERT", Content = "Admin détecté ! Farm stoppé."})
+                        break
+                    end
+                end
+                task.wait(2)
+            end
+        end)
+    end
+end)
+
 -- [[ 2. SECTION SNIPER FRUIT ]] --
 Tabs.Items:AddParagraph({
-    Title = "Détecteur de Fruits",
-    Content = "Collecte automatique avec pause temporaire du farm."
+    Title = "Inventaire & Fruits",
+    Content = "Le sniper récolte et stocke automatiquement."
 })
 
 local SniperToggle = Tabs.Items:AddToggle("FruitSniper", {Title = "Activer Fruit Sniper Pro", Default = false })
@@ -123,25 +151,16 @@ SniperToggle:OnChanged(function()
 end)
 
 -- [[ 3. SECTION VISUELS ]] --
-Tabs.Visuals:AddParagraph({
-    Title = "Améliorations Visuelles",
-    Content = "ESP et éclairage."
-})
-
-local ESPToggle = Tabs.Visuals:AddToggle("FruitESP", {Title = "ESP Fruits (Murs/Distance)", Default = false })
+local ESPToggle = Tabs.Visuals:AddToggle("FruitESP", {Title = "ESP Fruits", Default = false })
 
 ESPToggle:OnChanged(function()
     _G.FruitESP = Options.FruitESP.Value
     task.spawn(function()
         while _G.FruitESP do
-            if _G.Visuals then
-                _G.Visuals.UpdateESP(true)
-            end
+            if _G.Visuals then _G.Visuals.UpdateESP(true) end
             task.wait(3)
         end
-        if not _G.FruitESP and _G.Visuals then
-            _G.Visuals.UpdateESP(false)
-        end
+        if _G.Visuals then _G.Visuals.UpdateESP(false) end
     end)
 end)
 
@@ -156,18 +175,13 @@ Tabs.Visuals:AddToggle("FullBright", {Title = "Lumière Infinie", Default = fals
 end)
 
 -- [[ 4. SECTION SERVEUR & MISC ]] --
-Tabs.Misc:AddParagraph({
-    Title = "Gestion du Serveur",
-    Content = "Hop entre les serveurs pour trouver des fruits."
-})
-
 Tabs.Misc:AddButton({
     Title = "Server Hop (Rapide)",
-    Description = "Rejoint un nouveau serveur public.",
+    Description = "Idéal pour chercher des coffres ou fruits.",
     Callback = function()
         Window:Dialog({
             Title = "Changer de serveur ?",
-            Content = "Voulez-vous chercher un nouveau serveur ?",
+            Content = "Voulez-vous chercher un nouveau serveur public ?",
             Buttons = {
                 { Title = "Oui", Callback = function() ServerHop() end },
                 { Title = "Annuler" }
@@ -183,10 +197,7 @@ end)
 -- [[ 5. PARAMÈTRES SYSTÈME ]] --
 Tabs.Settings:AddButton({
     Title = "Détruire l'Interface",
-    Description = "Ferme proprement le script.",
-    Callback = function()
-        Window:Destroy()
-    end
+    Callback = function() Window:Destroy() end
 })
 
 -- [[ FINALISATION ]] --
@@ -199,7 +210,7 @@ SaveManager:BuildConfigSection(Tabs.Settings)
 
 Window:SelectTab(1)
 Fluent:Notify({
-    Title = "YUUSCRIPT CHARGÉ",
-    Content = "Prêt pour le farm avec l'arme sélectionnée !",
+    Title = "YUUSCRIPT V3.0 CHARGÉ",
+    Content = "Farming Sea 1 prêt avec " .. _G.SelectedWeapon .. " !",
     Duration = 5
 })
