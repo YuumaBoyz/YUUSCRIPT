@@ -1,4 +1,6 @@
--- [[ YUUSCRIPT V3.0 - ULTIMATE ENGINE (FRUIT SNIPER EDITION) ]] --
+-- [[ 🛡️ YUUSCRIPT V3.0 - ULTIMATE ENGINE (FRUIT SNIPER EDITION) ]] --
+
+-- **CHARGEMENT DES LIBRAIRIES**
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
@@ -6,9 +8,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 -- [[ 1. CONFIGURATION ET VARIABLES GLOBALES ]] --
 _G.AutoFarmEnabled = false
 _G.InstantSniper = false
-_G.TweenSpeed = 300
 _G.SelectedWeapon = "Combat"
-_G.BypassGates = true
 _G.AntiAFK = true
 
 local Players = game:GetService("Players")
@@ -17,6 +17,10 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
 local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- **SÉCURISATION DE L'INTERFACE JEU**
+local pGui = Player:WaitForChild("PlayerGui", 10)
+local mainGui = pGui and pGui:WaitForChild("Main", 10)
 
 -- [[ 2. BASE DE DONNÉES DES QUÊTES ]] --
 _G.QuestsData = {
@@ -46,25 +50,26 @@ _G.FruitSniper = FruitSniper
 
 function FruitSniper.Snap(item)
     if FruitSniper.DEBOUNCE or not _G.InstantSniper then return end
-    local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
     local handle = item:FindFirstChild("Handle") or item:FindFirstChildOfClass("Part") or item:FindFirstChildOfClass("MeshPart")
+    
     if not root or not handle then return end
 
     FruitSniper.DEBOUNCE = true
     pcall(function()
         local oldCFrame = root.CFrame
         local wasFarmEnabled = _G.AutoFarmEnabled
-        _G.AutoFarmEnabled = false -- Pause Autofarm
+        _G.AutoFarmEnabled = false 
         
-        Fluent:Notify({Title = "🍎 FRUIT DÉTECTÉ", Content = "Collecte de : " .. item.Name})
+        Fluent:Notify({Title = "🍎 FRUIT DÉTECTÉ", Content = "Collecte de : " .. item.Name, Duration = 5})
 
         root.Velocity = Vector3.new(0,0,0)
         root.CFrame = handle.CFrame * CFrame.new(0, 2, 0)
-        task.wait(0.1)
+        task.wait(0.2)
         firetouchinterest(root, handle, 0)
-        task.wait(0.1)
         firetouchinterest(root, handle, 1)
-        task.wait(0.3)
+        task.wait(0.2)
 
         root.CFrame = oldCFrame
         _G.AutoFarmEnabled = wasFarmEnabled
@@ -72,17 +77,18 @@ function FruitSniper.Snap(item)
     FruitSniper.DEBOUNCE = false
 end
 
+-- Boucle Sniper
 task.spawn(function()
     while true do
         if _G.InstantSniper and not FruitSniper.DEBOUNCE then
             for _, obj in pairs(workspace:GetChildren()) do
-                if obj.Name:find("Fruit") or obj:FindFirstChild("Fruit") then
+                if obj:IsA("Tool") and (obj.Name:find("Fruit") or obj:FindFirstChild("Handle")) then
                     FruitSniper.Snap(obj)
                     break
                 end
             end
         end
-        task.wait(0.5)
+        task.wait(1)
     end
 end)
 
@@ -97,6 +103,7 @@ end
 
 local function GetClosestMob(targetName)
     local closest, dist = nil, math.huge
+    if not workspace:FindFirstChild("Enemies") then return nil end
     for _, v in pairs(workspace.Enemies:GetChildren()) do
         if v.Name == targetName and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
             local r = v:FindFirstChild("HumanoidRootPart")
@@ -109,24 +116,41 @@ local function GetClosestMob(targetName)
     return closest
 end
 
+-- **DÉTECTION DE QUÊTE SÉCURISÉE (Correction Frame/Text)**
+local function CheckQuestActive()
+    if not mainGui then return false end
+    local success, result = pcall(function()
+        local qFrame = mainGui:FindFirstChild("Quest")
+        if qFrame and qFrame.Visible then
+            local container = qFrame:FindFirstChild("Container")
+            local title = container and container:FindFirstChildWhichIsA("TextLabel")
+            return title and title.Text ~= ""
+        end
+        return false
+    end)
+    return success and result
+end
+
 function AutofarmPro.Start()
     -- NoClip Loop
     task.spawn(function()
         while _G.AutoFarmEnabled do
             pcall(function()
-                for _, v in pairs(Player.Character:GetDescendants()) do
-                    if v:IsA("BasePart") then v.CanCollide = false end
+                if Player.Character then
+                    for _, v in pairs(Player.Character:GetDescendants()) do
+                        if v:IsA("BasePart") then v.CanCollide = false end
+                    end
                 end
             end)
-            task.wait()
+            task.wait(0.1)
         end
     end)
 
     -- Farm Loop
     task.spawn(function()
         while _G.AutoFarmEnabled do
-            pcall(function()
-                if FruitSniper.DEBOUNCE then task.wait(0.5) return end
+            local success, err = pcall(function()
+                if FruitSniper.DEBOUNCE then return end
                 
                 local lvl = Player.Data.Level.Value
                 local targetData = _G.QuestsData[1]
@@ -134,26 +158,24 @@ function AutofarmPro.Start()
                     if lvl >= data.Level then targetData = data end
                 end
 
-                local pGui = Player:FindFirstChild("PlayerGui")
-                local hasQuest = pGui.Main.Quest.Visible and pGui.Main.Quest.Container.QuestTitle.Text ~= ""
-
-                if not hasQuest then
+                if not CheckQuestActive() then
                     Player.Character.HumanoidRootPart.CFrame = targetData.Pos
                     task.wait(0.5)
                     Remote:InvokeServer("StartQuest", targetData.Name, targetData.QuestID)
                 else
                     local mob = GetClosestMob(targetData.Mob)
-                    if mob then
+                    if mob and mob:FindFirstChild("HumanoidRootPart") then
                         EquipWeapon()
                         Player.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 22, 0) * CFrame.Angles(math.rad(-90), 0, 0)
                         VirtualUser:CaptureController()
                         VirtualUser:Button1Down(Vector2.new())
                     else
-                        Player.Character.HumanoidRootPart.CFrame = targetData.Pos * CFrame.new(0, 40, 0)
+                        Player.Character.HumanoidRootPart.CFrame = targetData.Pos * CFrame.new(0, 50, 0)
                     end
                 end
             end)
-            task.wait()
+            if not success then warn("Erreur Farm: " .. err) end
+            task.wait(0.1)
         end
     end)
 end
@@ -170,26 +192,26 @@ local Tabs = {
     Misc = Window:AddTab({ Title = "Serveur", Icon = "shield" })
 }
 
-local Options = Fluent.Options
-
--- MAIN TAB
+-- TAB : AUTOFARM
 Tabs.Main:AddDropdown("WeaponDropdown", {
     Title = "Arme", Values = {"Combat", "Saber", "Pipe", "Katana", "Cutlass"},
     Default = "Combat", Callback = function(v) _G.SelectedWeapon = v end
 })
 
 Tabs.Main:AddToggle("AutoFarm", {Title = "Activer l'Autofarm", Default = false }):OnChanged(function()
-    _G.AutoFarmEnabled = Options.AutoFarm.Value
-    if _G.AutoFarmEnabled then _G.AutofarmPro.Start() end
+    _G.AutoFarmEnabled = Fluent.Options.AutoFarm.Value
+    if _G.AutoFarmEnabled then 
+        AutofarmPro.Start() 
+    end
 end)
 
--- ITEMS & FRUITS TAB
+-- TAB : ITEMS & FRUITS
 Tabs.Items:AddParagraph({Title = "Sniper", Content = "Téléportation et collecte immédiate des fruits spawnés."})
 Tabs.Items:AddToggle("FruitSniper", {Title = "Fruit Sniper (Instant TP)", Default = false }):OnChanged(function()
-    _G.InstantSniper = Options.FruitSniper.Value
+    _G.InstantSniper = Fluent.Options.FruitSniper.Value
 end)
 
--- SERVEUR TAB
+-- TAB : MISC
 Tabs.Misc:AddButton({
     Title = "Server Hop", Callback = function()
         local Servers = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
@@ -202,10 +224,13 @@ Tabs.Misc:AddButton({
     end
 })
 
--- Anti-AFK
+-- ANTI-AFK INITIALISATION
 if _G.AntiAFK then
-    Player.Idled:Connect(function() VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new()) end)
+    Player.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
 end
 
 Window:SelectTab(1)
-Fluent:Notify({Title = "YUUSCRIPT", Content = "Système de Sniper chargé ! 🍎"})
+Fluent:Notify({Title = "YUUSCRIPT", Content = "Système complet chargé avec succès ! 🍎", Duration = 5})
