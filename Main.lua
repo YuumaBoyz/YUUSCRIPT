@@ -1,7 +1,16 @@
 -- [[ 🛡️ YUUSCRIPT V3.0 - ULTIMATE ENGINE (FRUIT SNIPER EDITION) ]] --
 
+local function SafeLoad(url)
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet(url))()
+    end)
+    if not success then warn("⚠️ Erreur de réseau : " .. url) return nil end
+    return result
+end
+
 -- **CHARGEMENT DES LIBRAIRIES**
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local Fluent = SafeLoad("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
+if not Fluent then return end -- Arrêt si Fluent ne charge pas
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
@@ -92,6 +101,14 @@ task.spawn(function()
     end
 end)
 
+local function GetMainGui()
+    local pGui = Player:FindFirstChild("PlayerGui")
+    if pGui then
+        return pGui:WaitForChild("Main", 5) -- Attend 5 secondes max
+    end
+    return nil
+end
+
 -- [[ 4. MOTEUR D'AUTOFARM ]] --
 local AutofarmPro = {}
 _G.AutofarmPro = AutofarmPro
@@ -101,15 +118,34 @@ local function EquipWeapon()
     if tool then Player.Character.Humanoid:EquipTool(tool) end
 end
 
+-- **CORRECTIF : Éviter "Text is not a valid member of Frame"**
+local function IsQuestActive()
+    local main = GetMainGui()
+    if not main then return false end
+    
+    local questFrame = main:FindFirstChild("Quest")
+    if questFrame and questFrame.Visible then
+        local container = questFrame:FindFirstChild("Container")
+        if container then
+            -- On cherche n'importe quel TextLabel dans le container au lieu d'un nom fixe
+            local title = container:FindFirstChildWhichIsA("TextLabel")
+            return title and title.Text ~= ""
+        end
+    end
+    return false
+end
+
 local function GetClosestMob(targetName)
     local closest, dist = nil, math.huge
-    if not workspace:FindFirstChild("Enemies") then return nil end
-    for _, v in pairs(workspace.Enemies:GetChildren()) do
+    local enemies = workspace:FindFirstChild("Enemies")
+    if not enemies then return nil end
+    
+    for _, v in pairs(enemies:GetChildren()) do
         if v.Name == targetName and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-            local r = v:FindFirstChild("HumanoidRootPart")
-            if r then
-                local d = (Player.Character.HumanoidRootPart.Position - r.Position).Magnitude
-                if d < dist then dist = d closest = v end
+            local root = v:FindFirstChild("HumanoidRootPart")
+            if root then
+                local d = (Player.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                if d < dist then dist = d; closest = v end
             end
         end
     end
@@ -132,49 +168,42 @@ local function CheckQuestActive()
 end
 
 function AutofarmPro.Start()
-    -- NoClip Loop
     task.spawn(function()
         while _G.AutoFarmEnabled do
             pcall(function()
-                if Player.Character then
-                    for _, v in pairs(Player.Character:GetDescendants()) do
-                        if v:IsA("BasePart") then v.CanCollide = false end
-                    end
-                end
-            end)
-            task.wait(0.1)
-        end
-    end)
-
-    -- Farm Loop
-    task.spawn(function()
-        while _G.AutoFarmEnabled do
-            local success, err = pcall(function()
-                if FruitSniper.DEBOUNCE then return end
+                local char = Player.Character
+                if not char or not char:FindFirstChild("HumanoidRootPart") then return end
                 
+                -- Choix de la quête par niveau
                 local lvl = Player.Data.Level.Value
-                local targetData = _G.QuestsData[1]
+                local target = _G.QuestsData[1]
                 for _, data in ipairs(_G.QuestsData) do
-                    if lvl >= data.Level then targetData = data end
+                    if lvl >= data.Level then target = data end
                 end
 
-                if not CheckQuestActive() then
-                    Player.Character.HumanoidRootPart.CFrame = targetData.Pos
+                if not IsQuestActive() then
+                    -- Aller prendre la quête
+                    char.HumanoidRootPart.CFrame = target.Pos
                     task.wait(0.5)
-                    Remote:InvokeServer("StartQuest", targetData.Name, targetData.QuestID)
+                    Remote:InvokeServer("StartQuest", target.Name, target.QuestID)
                 else
-                    local mob = GetClosestMob(targetData.Mob)
+                    -- Tuer les monstres
+                    local mob = GetClosestMob(target.Mob)
                     if mob and mob:FindFirstChild("HumanoidRootPart") then
-                        EquipWeapon()
-                        Player.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 22, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+                        -- Equip weapon
+                        local tool = Player.Backpack:FindFirstChild(_G.SelectedWeapon)
+                        if tool then char.Humanoid:EquipTool(tool) end
+                        
+                        -- Position de combat (au dessus)
+                        char.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 25, 0)
                         VirtualUser:CaptureController()
                         VirtualUser:Button1Down(Vector2.new())
                     else
-                        Player.Character.HumanoidRootPart.CFrame = targetData.Pos * CFrame.new(0, 50, 0)
+                        -- Attente spawn
+                        char.HumanoidRootPart.CFrame = target.Pos * CFrame.new(0, 40, 0)
                     end
                 end
             end)
-            if not success then warn("Erreur Farm: " .. err) end
             task.wait(0.1)
         end
     end)
@@ -209,6 +238,11 @@ end)
 Tabs.Items:AddParagraph({Title = "Sniper", Content = "Téléportation et collecte immédiate des fruits spawnés."})
 Tabs.Items:AddToggle("FruitSniper", {Title = "Fruit Sniper (Instant TP)", Default = false }):OnChanged(function()
     _G.InstantSniper = Fluent.Options.FruitSniper.Value
+end)
+
+Tabs.Items:AddToggle("FruitESP", {Title = "Afficher l'ESP Fruits", Default = false }):OnChanged(function()
+    local Visuals = require(game:GetService("ReplicatedStorage"):WaitForChild("Visuals")) -- Ou ton chemin vers le fichier
+    Visuals.UpdateESP(Fluent.Options.FruitESP.Value)
 end)
 
 -- TAB : MISC
