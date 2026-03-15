@@ -8,6 +8,7 @@ _G.AutoFarmEnabled = false
 _G.SniperEnabled = false
 _G.FruitESP = false
 _G.AntiAFK = true
+_G.SelectedWeapon = "Combat" -- Valeur par défaut logicielle
 
 -- [[ FONCTION SERVER HOP ]] --
 local function ServerHop()
@@ -61,6 +62,17 @@ Tabs.Main:AddParagraph({
     Content = "Progression automatique et intelligente."
 })
 
+-- SÉLECTEUR D'ARME (Placé avant le bouton Start pour la logique)
+Tabs.Main:AddDropdown("WeaponDropdown", {
+    Title = "Arme à utiliser",
+    Description = "Sélectionne l'arme à équiper automatiquement.",
+    Values = {"Combat", "Saber", "Pipe", "Katana", "Cutlass", "Dual Katana", "Iron Mace"},
+    Default = "Combat",
+    Callback = function(Value)
+        _G.SelectedWeapon = Value
+    end
+})
+
 local FarmToggle = Tabs.Main:AddToggle("AutoFarm", {Title = "Activer l'Autofarm Global", Default = false })
 
 FarmToggle:OnChanged(function()
@@ -68,7 +80,7 @@ FarmToggle:OnChanged(function()
     if _G.AutoFarmEnabled then
         task.spawn(function()
             if _G.Autofarm then
-                _G.Autofarm.Start() -- Utilise la logique de niveau interne au module
+                _G.Autofarm.Start() 
             else
                 Fluent:Notify({Title = "Erreur", Content = "Module Autofarm non chargé !"})
             end
@@ -188,6 +200,6 @@ SaveManager:BuildConfigSection(Tabs.Settings)
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "YUUSCRIPT CHARGÉ",
-    Content = "Interface fusionnée avec succès. Bonne triche !",
+    Content = "Prêt pour le farm avec l'arme sélectionnée !",
     Duration = 5
 })

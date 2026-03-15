@@ -108,10 +108,20 @@ function AutofarmPro.GetTargetData()
     return target
 end
 
+local function EquipWeapon()
+    local weaponName = _G.SelectedWeapon
+    local char = Player.Character
+    if char and not char:FindFirstChild(weaponName) then
+        local tool = Player.Backpack:FindFirstChild(weaponName)
+        if tool then
+            char.Humanoid:EquipTool(tool)
+        end
+    end
+end
+
 function AutofarmPro.Start()
     _G.AutoFarmEnabled = true
-    Log("🚀", "***Machine à États lancée !*** Démarrage de la boucle haute performance.")
-
+    
     task.spawn(function()
         while _G.AutoFarmEnabled do
             local success, err = pcall(function()
@@ -119,26 +129,25 @@ function AutofarmPro.Start()
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if not root then return end
 
-                -- ÉTAPE 1 : ÉVALUATION DU NIVEAU
-                local currentTarget = AutofarmPro.GetTargetData()
+                local currentTarget = AutofarmPro.GetTargetData() -- Utilise ta table QuestsData
 
-                -- ÉTAPE 2 : GESTION DE LA QUÊTE (PRISE DE QUÊTE)
+                -- ÉTAPE : VÉRIFICATION QUÊTE
                 if not GetActiveQuest() then
-                    Log("📍", "Déplacement vers ***" .. currentTarget.NPC .. "***")
+                    -- TP NPC et Acceptation
+                    _G.TweenModule.MoveTo(currentTarget.Pos, _G.TweenSpeed).Completed:Wait()
                     
-                    -- Tween vers le PNJ
-                    local move = Tween.MoveTo(currentTarget.Pos, _G.TweenSpeed)
-                    move.Completed:Wait()
-
-                    -- Invoquer la quête (Remote Call)
-                    Remote:InvokeServer("StartQuest", currentTarget.Name, 1)
+                    -- L'ID "1" correspond souvent au Mob A, "2" au Mob B, etc.
+                    -- On s'assure d'invoquer la quête précise définie dans QuestsData
+                    game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", currentTarget.Name, 1)
                     task.wait(0.5)
+                else
+                    -- ÉTAPE : COMBAT CIBLÉ
+                    EquipWeapon() -- On s'assure d'avoir l'arme en main
 
-                -- ÉTAPE 3 : COMBAT (CHASSE AUX MOBS)
-                elseif CheckHealth() then
                     local mob = nil
-                    -- Optimisation : Recherche locale
+                    -- On cherche UNIQUEMENT le mob défini dans QuestsData pour ce palier
                     for _, v in pairs(workspace.Enemies:GetChildren()) do
+                        -- Condition STRICTE : Nom du mob EXACT et Vie > 0
                         if v.Name == currentTarget.Mob and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
                             mob = v
                             break
@@ -146,33 +155,16 @@ function AutofarmPro.Start()
                     end
 
                     if mob and mob:FindFirstChild("HumanoidRootPart") then
-                        -- Activation de l'outil
-                        local tool = Player.Backpack:FindFirstChildOfClass("Tool") or char:FindFirstChildOfClass("Tool")
-                        if tool then char.Humanoid:EquipTool(tool) end
-
-                        -- TP au-dessus du Mob (Évite de bugger dans le sol)
-                        -- On utilise un CFrame au dessus pour la sécurité
-                        local combatPos = mob.HumanoidRootPart.CFrame * CFrame.new(0, 30, 0)
-                        root.CFrame = combatPos -- TP Instant pour le combat (ou utilise Tween)
+                        -- TP sécurisé au-dessus du mob spécifique
+                        root.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 30, 0)
                         
-                        -- Attaque
-                        -- game:GetService("VirtualUser"):ClickButton1(Vector2.new(50,50))
-                    else
-                        -- Si aucun mob, aller à la zone de spawn
-                        Tween.MoveTo(currentTarget.Pos, _G.TweenSpeed)
+                        -- Commande d'attaque (VirtualUser pour simuler le clic)
+                        game:GetService("VirtualUser"):CaptureController()
+                        game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
                     end
-                else
-                    -- REPLI (HEALTH LOW)
-                    root.CFrame = root.CFrame * CFrame.new(0, 100, 0) -- S'envoler
-                    task.wait(2)
                 end
             end)
-
-            if not success then
-                warn("⚠️ Erreur de boucle : " .. err)
-                task.wait(1)
-            end
-            task.wait() -- Fréquence de rafraîchissement
+            task.wait()
         end
     end)
 end
