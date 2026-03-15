@@ -78,60 +78,57 @@ local function GetClosestMob(targetName, spawnPos)
 end
 
 -- [[ 3. BOUCLE DE DÉCISION INTELLIGENTE ]] --
+-- [[ MODIFICATION DE LA BOUCLE DE DÉCISION ]] --
 function AutofarmPro.Start()
     _G.AutoFarmEnabled = true
     SetNoClip(true)
-    Log("⚡", "***Initialisation de l'IA de combat...***")
+    Log("⚡", "***IA de combat débloquée.***")
 
     task.spawn(function()
         while _G.AutoFarmEnabled do
-            local success, err = pcall(function()
+            pcall(function()
                 local char = Player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if not root then return end
                 
-                Stabilize(root)
-                local targetData = AutofarmPro.GetTargetData() -- Récupère le mob selon le level
-
-                -- Vérification Quête
+                local targetData = AutofarmPro.GetTargetData()
                 local pGui = Player:FindFirstChild("PlayerGui")
-                local questTitle = pGui.Main.Quest.Container.QuestTitle.Text
-                local hasQuest = pGui.Main.Quest.Visible and questTitle ~= ""
+                local hasQuest = pGui.Main.Quest.Visible and pGui.Main.Quest.Container.QuestTitle.Text ~= ""
 
                 if not hasQuest then
-                    -- INTELLIGENCE : Si pas de quête, TP au PNJ
-                    Log("📍", "Déplacement vers le PNJ : " .. targetData.NPC)
-                    if _G.TweenModule then _G.TweenModule.Stop() end
-                    _G.TweenModule.MoveTo(targetData.Pos, _G.TweenSpeed).Completed:Wait()
+                    -- 🔓 ON DÉBLOQUE LA PHYSIQUE POUR BOUGER
+                    if root:FindFirstChild("YuuVelocity") then root.YuuVelocity:Destroy() end
+                    if root:FindFirstChild("YuuGyro") then root.YuuGyro:Destroy() end
                     
-                    task.wait(0.2)
+                    Log("📍", "Route vers : " .. targetData.NPC)
+                    if _G.TweenModule then 
+                        _G.TweenModule.MoveTo(targetData.Pos, _G.TweenSpeed).Completed:Wait()
+                    end
+                    
+                    task.wait(0.5)
                     Remote:InvokeServer("StartQuest", targetData.Name, targetData.QuestID)
                 else
-                    -- INTELLIGENCE : Analyse du terrain pour le TP Mob
+                    -- ⚔️ MODE COMBAT : ON ACTIVE LA STABILISATION
                     local mob = GetClosestMob(targetData.Mob, targetData.Pos)
                     
                     if mob then
-                        -- TP INSTANTANÉ SUR LE MOB
+                        Stabilize(root) -- On verrouille la physique seulement ici
                         local mRoot = mob.HumanoidRootPart
-                        -- Position 20 studs au dessus pour sécurité + angle d'attaque
                         root.CFrame = mRoot.CFrame * CFrame.new(0, 20, 0) * CFrame.Angles(math.rad(-90), 0, 0)
                         
-                        -- Exécution de l'attaque
+                        -- Attaque
                         if _G.FastAttack then 
                             _G.FastAttack.Attack() 
                         else 
-                            VirtualUser:CaptureController()
                             VirtualUser:Button1Down(Vector2.new(0,0)) 
                         end
                     else
-                        -- ANTI-STUCK : Si quête active mais mob pas encore là, on attend au spawn
-                        Log("⌛", "Attente du respawn de : " .. targetData.Mob)
+                        -- Attente du respawn : On reste stable en l'air
+                        Stabilize(root)
                         root.CFrame = targetData.Pos * CFrame.new(0, 30, 0)
                     end
                 end
             end)
-            
-            if not success then warn("Erreur IA: " .. err) end
             task.wait()
         end
     end)
