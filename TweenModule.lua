@@ -1,44 +1,66 @@
 local TweenService = game:GetService("TweenService")
 local TweenModule = {}
 
--- Paramètre de vitesse par défaut (modifiable via l'UI Fluent plus tard)
 _G.TweenSpeed = _G.TweenSpeed or 100
+local currentTween = nil -- Stocke le mouvement en cours
 
 function TweenModule.MoveTo(targetCFrame, speedOverride)
     local player = game.Players.LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
     local rootPart = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
     
-    -- Utilise la vitesse globale ou une vitesse spécifique si fournie
+    -- Arrêter le mouvement précédent s'il existe
+    if currentTween then currentTween:Cancel() end
+    
+    -- Calcul de la vitesse
     local currentSpeed = speedOverride or _G.TweenSpeed
-    
-    -- Calcul de la distance pour une vitesse constante
     local distance = (rootPart.Position - targetCFrame.Position).Magnitude
     local duration = distance / currentSpeed
     
-    -- Configuration du mouvement (Linéaire pour éviter les saccades)
-    local info = TweenInfo.new(
-        duration, 
-        Enum.EasingStyle.Linear, 
-        Enum.EasingDirection.Out
-    )
+    -- [[ SÉCURITÉ : NOCLIP ]] --
+    -- Active le passage à travers les murs pendant le trajet
+    local noclipLoop
+    noclipLoop = game:GetService("RunService").Stepped:Connect(function()
+        if character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+
+    -- Configuration du Tween
+    local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    currentTween = TweenService:Create(rootPart, info, {CFrame = targetCFrame})
     
-    local tween = TweenService:Create(rootPart, info, {CFrame = targetCFrame})
+    -- [[ STABILISATION ]] --
+    -- On force la vélocité à zéro pour éviter les "glissades" à l'arrivée
+    rootPart.Velocity = Vector3.new(0, 0, 0)
+    rootPart.RotVelocity = Vector3.new(0, 0, 0)
     
-    -- Exécution du mouvement
-    tween:Play()
+    currentTween:Play()
     
-    -- On retourne le tween pour pouvoir utiliser .Completed:Wait() dans les autres scripts
-    return tween
+    -- [[ NETTOYAGE APRÈS ARRIVÉE ]] --
+    currentTween.Completed:Connect(function()
+        if noclipLoop then noclipLoop:Disconnect() end
+        -- Redonner la collision après l'arrivée
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end)
+    
+    return currentTween
 end
 
--- Fonction pour stopper instantanément tout mouvement en cours
+-- Stop complet et propre
 function TweenModule.Stop()
-    local player = game.Players.LocalPlayer
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local rootPart = player.Character.HumanoidRootPart
-        local stopTween = TweenService:Create(rootPart, TweenInfo.new(0), {CFrame = rootPart.CFrame})
-        stopTween:Play()
+    if currentTween then
+        currentTween:Cancel()
+        currentTween = nil
     end
 end
 
