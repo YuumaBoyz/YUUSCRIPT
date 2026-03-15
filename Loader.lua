@@ -1,14 +1,25 @@
 --[[ 👑 YUUSCRIPT V12 - OFFICIAL LOADER ]]
 local function Load(file)
-    -- Remplace "YUUMA_REPO" par ton vrai lien GitHub brut plus tard
-    local url = "https://raw.githubusercontent.com/YUUMA_REPO/main/" .. file .. ".lua"
+    -- ✅ UTILISATION DU LIEN RAW CORRECT
+    local url = "https://github.com/YuumaBoyz/YUUSCRIPT/main/MainUI.lua" .. file .. ".lua"
+    
+    print("📡 Tentative de chargement : " .. file) -- Pour débugger dans la console (F9)
+
     local success, result = pcall(function()
-        return loadstring(game:HttpGet(url))()
+        local code = game:HttpGet(url)
+        if code then
+            return loadstring(code)()
+        end
     end)
-    if not success then warn("❌ Erreur de chargement : " .. file .. " -> " .. result) end
+
+    if success then 
+        print("✅ Chargé avec succès : " .. file)
+    else 
+        warn("❌ Erreur de chargement : " .. file .. " -> " .. result) 
+    end
 end
 
 -- Ordre de chargement critique
-Load("Config")    -- 1. On définit les variables
-Load("Functions") -- 2. On charge les moteurs
-Load("MainUI")    -- 3. On affiche l'interface
+Load("Config")    
+Load("Functions") 
+Load("MainUI")
