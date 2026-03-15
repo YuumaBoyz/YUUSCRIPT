@@ -1,155 +1,185 @@
-local Autofarm = {}
-local Tween = _G.TweenModule 
+--[[
+    💎 YUUSCRIPT : ULTIMATE STATE-MACHINE AUTOFARM
+    Expert : Expert Luau Developer
+    Target : Blox Fruits (Standard Logic)
+]]
 
--- [[ CONFIGURATION ]] --
-local DISTANCE_ABOVE_MOB = 7 
-local USE_SKILLS = true
+local AutofarmPro = {}
 
--- [[ BASE DE DONNÉES SEA 1 ]] --
-local QuestData = {
-    {Level = 0,   Mob = "Bandit",             NPC = "Bandit Quest Giver", QuestName = "BanditQuest1", Pos = Vector3.new(1059, 16, 1547)},
-    {Level = 10,  Mob = "Monkey",             NPC = "Monkey Quest Giver", QuestName = "MonkeyQuest1", Pos = Vector3.new(-1598, 37, 153)},
-    {Level = 15,  Mob = "Gorilla",            NPC = "Monkey Quest Giver", QuestName = "GorillaQuest1", Pos = Vector3.new(-1598, 37, 153)},
-    {Level = 30,  Mob = "Pirate",             NPC = "Pirate Island",      QuestName = "PirateIslandQuest1", Pos = Vector3.new(-1141, 4, 3832)},
-    {Level = 60,  Mob = "Desert Bandit",      NPC = "Desert Adventurer",  QuestName = "DesertQuest1", Pos = Vector3.new(894, 6, 4390)},
-    {Level = 90,  Mob = "Snow Bandit",        NPC = "Snow Adventurer",    QuestName = "SnowQuest1", Pos = Vector3.new(1389, 15, -1299)},
-    {Level = 110, Mob = "Yeti",               NPC = "Snow Adventurer",    QuestName = "SnowQuest3", Pos = Vector3.new(1389, 15, -1299)},
-    {Level = 130, Mob = "Vice Admiral",       NPC = "Marine Officer",     QuestName = "MarineFordQuest2", Pos = Vector3.new(-4894, 20, 4265)},
-    {Level = 150, Mob = "Sky Bandit",         NPC = "Sky Adventurer",     QuestName = "SkyQuest1", Pos = Vector3.new(-4840, 718, -2620)},
-    {Level = 230, Mob = "Chief Warden",       NPC = "Chief Warden",       QuestName = "PrisonQuest2", Pos = Vector3.new(4879, 6, 734)},
-    {Level = 475, Mob = "Sawfish",            NPC = "Fishman Warrior",    QuestName = "FishmanQuest3", Pos = Vector3.new(-3683, 7, -5282)},
-    {Level = 675, Mob = "Cyborg",             NPC = "Cyborg",             QuestName = "FountainQuest3", Pos = Vector3.new(5259, 38, 4050)}
+-- [[ SERVICES ]] --
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- [[ VARIABLES LOCALES ]] --
+local Player = Players.LocalPlayer
+local Tween = _G.TweenModule -- Moteur de mouvement global
+local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_") -- Remote principal
+
+-- [[ CONFIGURATION DES QUÊTES ]] --
+local QuestsData = {
+    -- [[ STARTER ISLAND ]] --
+    {Level = 0, NPC = "Bandit Quest Giver", Name = "BanditQuest1", Mob = "Bandit", Pos = CFrame.new(1059, 16, 1549)},
+    
+    -- [[ JUNGLE ]] --
+    {Level = 10, NPC = "Adventurer", Name = "JungleQuest", Mob = "Monkey", Pos = CFrame.new(-1610, 37, 153)},
+    {Level = 15, NPC = "Adventurer", Name = "JungleQuest", Mob = "Gorilla", Pos = CFrame.new(-1610, 37, 153)},
+    
+    -- [[ PIRATE VILLAGE ]] --
+    {Level = 30, NPC = "Pirate Adventurer", Name = "BuggyQuest1", Mob = "Pirate", Pos = CFrame.new(-1141, 5, 3827)},
+    {Level = 40, NPC = "Pirate Adventurer", Name = "BuggyQuest1", Mob = "Brute", Pos = CFrame.new(-1141, 5, 3827)},
+    {Level = 55, NPC = "Pirate Adventurer", Name = "BuggyQuest1", Mob = "Bobby", Pos = CFrame.new(-1141, 5, 3827)},
+    
+    -- [[ DESERT ]] --
+    {Level = 60, NPC = "Desert Adventurer", Name = "DesertQuest", Mob = "Desert Bandit", Pos = CFrame.new(896, 6, 4390)},
+    {Level = 75, NPC = "Desert Adventurer", Name = "DesertQuest", Mob = "Desert Officer", Pos = CFrame.new(896, 6, 4390)},
+    
+    -- [[ FROZEN VILLAGE ]] --
+    {Level = 90, NPC = "Snow Adventurer", Name = "SnowQuest", Mob = "Snow Bandit", Pos = CFrame.new(1385, 15, -1303)},
+    {Level = 100, NPC = "Snow Adventurer", Name = "SnowQuest", Mob = "Snowman", Pos = CFrame.new(1385, 15, -1303)},
+    {Level = 105, NPC = "Snow Adventurer", Name = "SnowQuest", Mob = "Yeti", Pos = CFrame.new(1385, 15, -1303)},
+    
+    -- [[ MARINE FORTRESS ]] --
+    {Level = 120, NPC = "Marine Officer", Name = "MarineQuest2", Mob = "Chief Petty Officer", Pos = CFrame.new(-4942, 21, 4381)},
+    {Level = 150, NPC = "Marine Officer", Name = "MarineQuest2", Mob = "Warden", Pos = CFrame.new(-4942, 21, 4381)},
+    
+    -- [[ SKY ISLANDS (BASSE) ]] --
+    {Level = 150, NPC = "Sky Adventurer", Name = "SkyQuest", Mob = "Sky Bandit", Pos = CFrame.new(-4842, 718, -2620)},
+    {Level = 175, NPC = "Sky Adventurer", Name = "SkyQuest", Mob = "Dark Adventurer", Pos = CFrame.new(-4842, 718, -2620)},
+    
+    -- [[ PRISON ]] --
+    {Level = 190, NPC = "Prison Warden", Name = "PrisonQuest", Mob = "Warden", Pos = CFrame.new(4875, 6, 735)},
+    {Level = 210, NPC = "Prison Warden", Name = "PrisonQuest", Mob = "Chief Warden", Pos = CFrame.new(4875, 6, 735)},
+    {Level = 230, NPC = "Prison Warden", Name = "PrisonQuest", Mob = "Swan", Pos = CFrame.new(4875, 6, 735)},
+    
+    -- [[ MAGMA VILLAGE ]] --
+    {Level = 250, NPC = "Magma Adventurer", Name = "MagmaQuest", Mob = "Military Soldier", Pos = CFrame.new(-5315, 12, 8517)},
+    {Level = 275, NPC = "Magma Adventurer", Name = "MagmaQuest", Mob = "Military Spy", Pos = CFrame.new(-5315, 12, 8517)},
+    {Level = 300, NPC = "Magma Adventurer", Name = "MagmaQuest", Mob = "Magma Admiral", Pos = CFrame.new(-5315, 12, 8517)},
+    
+    -- [[ UNDERWATER CITY ]] --
+    {Level = 375, NPC = "Water Adventurer", Name = "FishmanQuest", Mob = "Fishman Warrior", Pos = CFrame.new(61122, 18, 1569)},
+    {Level = 400, NPC = "Water Adventurer", Name = "FishmanQuest", Mob = "Fishman Commando", Pos = CFrame.new(61122, 18, 1569)},
+    
+    -- [[ SKY ISLANDS (HAUTE) ]] --
+    {Level = 450, NPC = "Mole", Name = "SkyExp1Quest", Mob = "God's Guard", Pos = CFrame.new(-4607, 850, -1915)},
+    {Level = 475, NPC = "Mole", Name = "SkyExp1Quest", Mob = "Shanda", Pos = CFrame.new(-4607, 850, -1915)},
+    {Level = 525, NPC = "Mole", Name = "SkyExp2Quest", Mob = "Royal Squad", Pos = CFrame.new(-7852, 5545, -381)},
+    {Level = 550, NPC = "Mole", Name = "SkyExp2Quest", Mob = "Royal Soldier", Pos = CFrame.new(-7852, 5545, -381)},
+    
+    -- [[ FOUNTAIN CITY ]] --
+    {Level = 625, NPC = "Cyborg Quest Giver", Name = "FountainQuest", Mob = "Galley Pirate", Pos = CFrame.new(5259, 39, 4050)},
+    {Level = 650, NPC = "Cyborg Quest Giver", Name = "FountainQuest", Mob = "Galley Captain", Pos = CFrame.new(5259, 39, 4050)}
 }
 
--- [[ FONCTION : NOCLIP (ÉVITE DE S'ENFONCER) ]] --
-local function ApplyNoclip()
-    if _G.AutoFarmEnabled then
-        local character = game.Players.LocalPlayer.Character
-        if character then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
+-- [[ SYSTÈME DE LOGS ]] --
+local function Log(emoji, msg)
+    print(string.format("%s [YUUSCRIPT] : %s", emoji, msg))
+end
+
+-- [[ FONCTIONS DE SÉCURITÉ ]] --
+local function CheckHealth()
+    local char = Player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and (hum.Health / hum.MaxHealth) < 0.25 then -- Se replier à 25% de PV
+        Log("🛡️", "***Santé critique !*** Retrait stratégique.")
+        return false
+    end
+    return true
+end
+
+local function GetActiveQuest()
+    local pGui = Player:FindFirstChild("PlayerGui")
+    if pGui and pGui:FindFirstChild("Main") and pGui.Main:FindFirstChild("Quest") then
+        return pGui.Main.Quest.Visible
+    end
+    return false
+end
+
+-- [[ LOGIQUE DE LA MACHINE À ÉTATS ]] --
+function AutofarmPro.GetTargetData()
+    local currentLevel = Player.Data.Level.Value
+    local target = QuestsData[1]
+    for _, data in ipairs(QuestsData) do
+        if currentLevel >= data.Level then
+            target = data
         end
     end
+    return target
 end
 
--- [[ FONCTION : ÉQUIPER L'ARME AUTOMATIQUEMENT ]] --
-local function AutoEquip()
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if character and not character:FindFirstChildOfClass("Tool") then
-        local backpack = player.Backpack
-        -- Priorité : Fruit ou Epée présente dans le Backpack
-        local tool = backpack:FindFirstChild("Melee") or backpack:FindFirstChildOfClass("Tool")
-        if tool then
-            character.Humanoid:EquipTool(tool)
-        end
-    end
-end
-
--- [[ FONCTION : SKILLS SPAM (Z,X,C,V) ]] --
-local function UseSkills()
-    if not USE_SKILLS then return end
-    local VIM = game:GetService("VirtualInputManager")
-    for _, key in ipairs({"Z", "X", "C", "V"}) do
-        VIM:SendKeyEvent(true, Enum.KeyCode[key], false, game)
-        task.wait(0.01) -- Délai ultra court pour spam
-        VIM:SendKeyEvent(false, Enum.KeyCode[key], false, game)
-    end
-end
-
--- [[ LOGIQUE DE QUÊTE SELON LE NIVEAU ]] --
-local function GetMyQuest()
-    local level = game.Players.LocalPlayer.Data.Level.Value
-    local best = QuestData[1]
-    for _, q in ipairs(QuestData) do
-        if level >= q.Level then best = q end
-    end
-    return best
-end
-
-function Autofarm.Start()
+function AutofarmPro.Start()
     _G.AutoFarmEnabled = true
-    local player = game.Players.LocalPlayer
-    
-    -- 🛡️ BOUCLE NOCLIP PERMANENTE (Priorité haute)
+    Log("🚀", "***Machine à États lancée !*** Démarrage de la boucle haute performance.")
+
     task.spawn(function()
         while _G.AutoFarmEnabled do
-            ApplyNoclip()
-            task.wait(0.1)
-        end
-    end)
+            local success, err = pcall(function()
+                local char = Player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
 
-    -- ⚔️ BOUCLE PRINCIPALE DE FARM
-    task.spawn(function()
-        while _G.AutoFarmEnabled do
-            task.wait(0.05)
-            local character = player.Character
-            if not character or not character:FindFirstChild("HumanoidRootPart") then continue end
-            local rootPart = character.HumanoidRootPart
-            
-            local hasQuest = player.PlayerGui.Main:FindFirstChild("Quest") and player.PlayerGui.Main.Quest.Visible
-            local current = GetMyQuest()
+                -- ÉTAPE 1 : ÉVALUATION DU NIVEAU
+                local currentTarget = AutofarmPro.GetTargetData()
 
-            if not hasQuest then
-                -- ⚡ TP INSTANT AU NPC (Gain de temps max)
-                rootPart.CFrame = CFrame.new(current.Pos)
-                task.wait(0.3)
-                game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", current.QuestName, 1)
-                task.wait(0.1)
-            else
-                -- 🔍 RECHERCHE DE CIBLE INTELLIGENTE
-                local targetMob = nil
-                local potentialTargets = {}
-                
-                -- Fusion des scans (Workspace + Dossier Enemies)
-                if workspace:FindFirstChild("Enemies") then
-                    for _, v in pairs(workspace.Enemies:GetChildren()) do table.insert(potentialTargets, v) end
-                end
-                for _, v in pairs(workspace:GetChildren()) do
-                    if v.Name == current.Mob then table.insert(potentialTargets, v) end
-                end
-
-                for _, mob in pairs(potentialTargets) do
-                    if mob.Name == current.Mob and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
-                        targetMob = mob
-                        break
-                    end
-                end
-
-                if targetMob then
-                    -- 🔧 PRÉPARATION COMBAT
-                    AutoEquip()
+                -- ÉTAPE 2 : GESTION DE LA QUÊTE (PRISE DE QUÊTE)
+                if not GetActiveQuest() then
+                    Log("📍", "Déplacement vers ***" .. currentTarget.NPC .. "***")
                     
-                    repeat
-                        if not _G.AutoFarmEnabled then break end
-                        if not targetMob:FindFirstChild("HumanoidRootPart") then break end
-                        
-                        -- 🏎️ UTILISATION DU TWEEN POUR COLLER AU MOB (Stabilité)
-                        Tween.MoveTo(targetMob.HumanoidRootPart.CFrame * CFrame.new(0, DISTANCE_ABOVE_MOB, 0), 800)
-                        
-                        -- 💥 ATTAQUE NORMALE + SPAM SKILLS
-                        local tool = character:FindFirstChildOfClass("Tool")
-                        if tool then tool:Activate() end
-                        UseSkills()
-                        
-                        task.wait(0.1)
-                    until not targetMob or not targetMob:FindFirstChild("Humanoid") or targetMob.Humanoid.Health <= 0
-                else
-                    -- ☁️ ATTENTE SÉCURISÉE (Évite de tomber ou d'être frappé)
-                    rootPart.CFrame = CFrame.new(current.Pos) + Vector3.new(0, 80, 0)
+                    -- Tween vers le PNJ
+                    local move = Tween.MoveTo(currentTarget.Pos, _G.TweenSpeed)
+                    move.Completed:Wait()
+
+                    -- Invoquer la quête (Remote Call)
+                    Remote:InvokeServer("StartQuest", currentTarget.Name, 1)
                     task.wait(0.5)
+
+                -- ÉTAPE 3 : COMBAT (CHASSE AUX MOBS)
+                elseif CheckHealth() then
+                    local mob = nil
+                    -- Optimisation : Recherche locale
+                    for _, v in pairs(workspace.Enemies:GetChildren()) do
+                        if v.Name == currentTarget.Mob and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                            mob = v
+                            break
+                        end
+                    end
+
+                    if mob and mob:FindFirstChild("HumanoidRootPart") then
+                        -- Activation de l'outil
+                        local tool = Player.Backpack:FindFirstChildOfClass("Tool") or char:FindFirstChildOfClass("Tool")
+                        if tool then char.Humanoid:EquipTool(tool) end
+
+                        -- TP au-dessus du Mob (Évite de bugger dans le sol)
+                        -- On utilise un CFrame au dessus pour la sécurité
+                        local combatPos = mob.HumanoidRootPart.CFrame * CFrame.new(0, 30, 0)
+                        root.CFrame = combatPos -- TP Instant pour le combat (ou utilise Tween)
+                        
+                        -- Attaque
+                        -- game:GetService("VirtualUser"):ClickButton1(Vector2.new(50,50))
+                    else
+                        -- Si aucun mob, aller à la zone de spawn
+                        Tween.MoveTo(currentTarget.Pos, _G.TweenSpeed)
+                    end
+                else
+                    -- REPLI (HEALTH LOW)
+                    root.CFrame = root.CFrame * CFrame.new(0, 100, 0) -- S'envoler
+                    task.wait(2)
                 end
+            end)
+
+            if not success then
+                warn("⚠️ Erreur de boucle : " .. err)
+                task.wait(1)
             end
+            task.wait() -- Fréquence de rafraîchissement
         end
     end)
 end
 
-function Autofarm.Stop()
+function AutofarmPro.Stop()
     _G.AutoFarmEnabled = false
-    print("🛑 Autofarm arrêté.")
+    Log("🛑", "***Système arrêté.***")
 end
 
-return Autofarm
+return AutofarmPro
