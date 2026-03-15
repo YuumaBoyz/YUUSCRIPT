@@ -1,5 +1,6 @@
 -- [[ MODULE AUTOFARM PRO V3.0 ]] --
-local AutofarmPro = {}
+local AutofarmPro = {} 
+_G.AutofarmPro = AutofarmPro
 
 -- [[ SERVICES ]] --
 local Players = game:GetService("Players")
@@ -184,6 +185,20 @@ function AutofarmPro.Stop()
     _G.AutoFarmEnabled = false
     Log("🛑", "Arrêt du moteur de farm.")
 end
+
+-- [[ 2. L'INTERFACE EN DERNIER ]] --
+local Window = Fluent:CreateWindow(...)
+
+local FarmToggle = Tabs.Main:AddToggle("AutoFarm", {Title = "Activer l'Autofarm", Default = false })
+FarmToggle:OnChanged(function()
+    _G.AutoFarmEnabled = Options.AutoFarm.Value
+    if _G.AutoFarmEnabled then
+        -- On vérifie que la fonction existe avant de l'appeler (Correctif Nil Value)
+        if AutofarmPro.Start then 
+            AutofarmPro.Start() 
+        end
+    end
+end)
 
 -- Synchronisation Globale
 _G.AutofarmPro = AutofarmPro
