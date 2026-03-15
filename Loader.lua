@@ -1,48 +1,92 @@
--- [[ 💎 YUUSCRIPT : LOADER UNIVERSEL ]] --
+-- [[ 🛡️ YUUSCRIPT : LOADER UNIVERSEL ET SÉCURISÉ ]] --
 
 local base_url = "https://raw.githubusercontent.com/YuumaBoyz/YUUSCRIPT/main/"
+local modules = {
+    {name = "Interface (Fluent)", file = "Main.lua"},
+    {name = "Moteur de Mouvement", file = "TweenModule.lua"},
+    {name = "Combat Rapide", file = "FastAttack.lua"},
+    {name = "Logique de Farm", file = "Autofarm.lua"},
+    {name = "Détection de Fruits", file = "FruitSniper.lua"},
+    {name = "Système Visuel", file = "Visuals.lua"}
+}
 
--- Configuration Initiale (À modifier selon tes besoins)
-_G.SelectedWeapon = "Combat" -- Remplace par "Katana" ou autre si besoin
-_G.TweenSpeed = 300          -- Vitesse du Tween
-_G.AutoFarmEnabled = false   -- Par défaut à false pour sécurité au lancement
+-- ⚙️ Configuration Globale
+_G.SelectedWeapon = "Combat"
+_G.TweenSpeed = 300
+_G.AutoFarmEnabled = false
+_G.YuuLoaded = false
 
--- Fonction de chargement sécurisée
-local function loadModule(fileName)
+-- 🛠️ Fonction de chargement avec tentative de secours (Retry Logic)
+local function safeLoad(fileName, displayName)
     local full_url = base_url .. fileName
-    local success, result = pcall(function()
-        return loadstring(game:HttpGet(full_url))()
-    end)
+    local attempts = 0
+    local max_attempts = 3
+    local result = nil
+
+    repeat
+        attempts = attempts + 1
+        local success, content = pcall(function()
+            return game:HttpGet(full_url)
+        end)
+
+        if success and content then
+            local func, err = loadstring(content)
+            if func then
+                result = func()
+                print("✅ [LOADER] : " .. displayName .. " chargé avec succès.")
+                return result
+            else
+                warn("❌ [ERREUR SCRIPT] : " .. displayName .. " -> " .. tostring(err))
+            end
+        else
+            warn("⏳ [RETRY] : " .. displayName .. " (Tentative " .. attempts .. "/" .. max_attempts .. ")")
+            task.wait(1)
+        end
+    until attempts >= max_attempts
+
+    return nil
+end
+
+-- 🚀 Lancement du processus de chargement
+print("-----------------------------------------")
+print("🔥 YUUSCRIPT INITIALISATION...")
+print("-----------------------------------------")
+
+-- 1. On attend que le jeu soit prêt (Fix : image_1e54ff.jpg)
+if not game:IsLoaded() then game.Loaded:Wait() end
+local Player = game:GetService("Players").LocalPlayer
+Player:WaitForChild("PlayerGui"):WaitForChild("Main", 20)
+
+-- 2. Chargement séquentiel
+for _, module in ipairs(modules) do
+    local loaded = safeLoad(module.file, module.name)
     
-    if success then
-        return result
-    else
-        warn("❌ Erreur de chargement : " .. fileName .. " | " .. tostring(result))
-        return nil
+    -- Assignation aux variables globales pour l'accès inter-scripts
+    if module.file == "TweenModule.lua" then _G.TweenModule = loaded
+    elseif module.file == "FastAttack.lua" then _G.FastAttack = loaded
+    elseif module.file == "Autofarm.lua" then _G.Autofarm = loaded
+    elseif module.file == "FruitSniper.lua" then _G.FruitSniper = loaded
+    elseif module.file == "Visuals.lua" then _G.Visuals = loaded
     end
 end
 
--- [[ CHARGEMENT DES MODULES DANS L'ORDRE LOGIQUE ]] --
+-- 3. Initialisation des moteurs
+task.spawn(function()
+    if _G.FastAttack and _G.FastAttack.Start then
+        _G.FastAttack.Start()
+        print("⚡ [YUUSCRIPT] : FastAttack activé.")
+    end
+    
+    _G.YuuLoaded = true
+    print("-----------------------------------------")
+    print("✨ [YUUSCRIPT] : TOUS LES SYSTÈMES SONT PRÊTS.")
+    print("-----------------------------------------")
+end)
 
--- 1. Utilitaires de mouvement
-_G.TweenModule = loadModule("TweenModule.lua")
-
--- 2. Système de combat (VITAL : Charger FastAttack AVANT l'Autofarm)
-_G.FastAttack = loadModule("FastAttack.lua")
-
--- 3. Logique de jeu
-_G.Autofarm = loadModule("Autofarm.lua")
-_G.FruitSniper = loadModule("FruitSniper.lua")
-_G.Visuals = loadModule("Visuals.lua")
-
--- [[ INITIALISATION ]] --
-
--- On lance la boucle du FastAttack en fond
-if _G.FastAttack and _G.FastAttack.Start then
-    _G.FastAttack.Start()
-end
-
--- Lancement de l'interface (Main.lua)
-loadModule("Main.lua")
-
-print("✨ [YUUSCRIPT] : Système prêt. Fast Attack en veille.")
+-- Notification visuelle
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "YUUSCRIPT V3.0",
+    Text = "Système chargé. Appuie sur [R-CTRL] pour le menu.",
+    Icon = "rbxassetid://6034509993",
+    Duration = 10
+})
