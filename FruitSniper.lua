@@ -1,8 +1,7 @@
 local FruitSniper = {}
-local Tween = _G.TweenModule 
+-- Plus besoin de Tween ici pour la collecte
 
 -- [[ PARAMÈTRES ]] --
-local SNIPE_SPEED = 350 
 local CHECK_DELAY = 1.5
 local DEBOUNCE = false 
 
@@ -20,7 +19,7 @@ local function NotifyFruit(title, content, sub)
     end
 end
 
--- [[ LOGIQUE DE COLLECTE ]] --
+-- [[ LOGIQUE DE COLLECTE INSTANTANÉE ]] --
 function FruitSniper.CheckAndCollect()
     if DEBOUNCE or not _G.SniperEnabled then return end
     
@@ -31,58 +30,37 @@ function FruitSniper.CheckAndCollect()
     local rootPart = character.HumanoidRootPart
 
     for _, item in pairs(workspace:GetChildren()) do
-        -- Détection multi-format (Tool ou Model avec Handle)
         if (item:IsA("Tool") or item:IsA("Model")) and (item.Name:find("Fruit") or item:FindFirstChild("Handle") or item:FindFirstChild("Fruit")) then
             local targetPart = item:FindFirstChild("Handle") or item:FindFirstChildOfClass("Part")
             
             if targetPart then
                 DEBOUNCE = true
                 
-                -- 1. SAUVEGARDE & PAUSE AUTOFARM 📍
+                -- 1. SAUVEGARDE & PAUSE 📍
                 local oldCFrame = rootPart.CFrame
                 local fruitName = item.Name
                 local wasFarmEnabled = _G.AutoFarmEnabled
-                _G.AutoFarmEnabled = false -- Pause pour éviter les conflits de mouvement
+                _G.AutoFarmEnabled = false 
                 
-                NotifyFruit("🍎 Fruit Détecté", "Cible : " .. fruitName, "Téléportation prioritaire...")
+                NotifyFruit("🍎 Fruit Détecté", "Cible : " .. fruitName, "TP Instantané...")
 
-                -- 2. DÉPLACEMENT SÉCURISÉ 🚀
-                local move = Tween.MoveTo(targetPart.CFrame * CFrame.new(0, 2, 0), SNIPE_SPEED)
+                -- 2. TÉLÉPORTATION DIRECTE ⚡
+                task.wait(0.1)
+                rootPart.CFrame = targetPart.CFrame * CFrame.new(0, 2, 0)
                 
-                local success = true
-                local arrived = false
-                
-                -- Connexion pour détecter l'arrivée
-                local connection
-                connection = move.Completed:Connect(function() 
-                    arrived = true 
-                    connection:Disconnect()
-                end)
-                
-                -- Timeout de sécurité (10s max pour le trajet)
-                local start = tick()
-                repeat task.wait() until arrived or (tick() - start) > 10
-                
-                if not arrived then success = false end
-
                 -- 3. COLLECTE FORCÉE 🖐️
-                if success then
-                    task.wait(0.3)
-                    -- Simulation de contact physique Triple A
-                    firetouchinterest(rootPart, targetPart, 0) 
-                    firetouchinterest(rootPart, targetPart, 1)
-                    
-                    task.wait(0.7) -- Latence serveur
-                    NotifyFruit("✅ Succès", fruitName .. " récupéré !", "Retour au point de départ...")
-                else
-                    NotifyFruit("⚠️ Échec", "Le trajet a pris trop de temps.", "Retour forcé.")
-                end
-
-                -- 4. RETOUR & REPRISE 🔙
-                local back = Tween.MoveTo(oldCFrame, SNIPE_SPEED)
-                back.Completed:Wait()
+                task.wait(0.2)
+                firetouchinterest(rootPart, targetPart, 0) 
+                firetouchinterest(rootPart, targetPart, 1)
                 
-                _G.AutoFarmEnabled = wasFarmEnabled -- Relance l'autofarm là où il en était
+                task.wait(0.5) -- Temps de latence serveur pour confirmer l'inventaire
+                NotifyFruit("✅ Succès", fruitName .. " récupéré !", "Retour au farm...")
+
+                -- 4. RETOUR INSTANTANÉ 🔙
+                rootPart.CFrame = oldCFrame
+                
+                task.wait(0.1)
+                _G.AutoFarmEnabled = wasFarmEnabled 
                 DEBOUNCE = false
                 break 
             end
@@ -93,7 +71,7 @@ end
 -- [[ GESTION DES BOUCLES ]] --
 function FruitSniper.StartLoop()
     _G.SniperEnabled = true
-    NotifyFruit("🚀 Sniper Actif", "Scan du serveur en cours...", "Vérification toutes les " .. CHECK_DELAY .. "s")
+    NotifyFruit("🚀 Sniper Actif", "Scan Instantané actif", "")
     
     task.spawn(function()
         while _G.SniperEnabled do
@@ -113,5 +91,5 @@ function FruitSniper.Stop()
     NotifyFruit("🔇 Sniper Off", "Scan interrompu.", "")
 end
 
-_G.FruitSniper = FruitSniper -- Export global pour l'interface
+_G.FruitSniper = FruitSniper 
 return FruitSniper
