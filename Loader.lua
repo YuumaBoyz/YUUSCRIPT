@@ -26,6 +26,7 @@ end
 _G.TweenModule = loadModule("TweenModule.lua")
 _G.Autofarm = loadModule("Autofarm.lua")
 _G.FruitSniper = loadModule("FruitSniper.lua")
+_G.Visuals = loadModule("Visuals.lua")
 
 -- Lancement de l'interface principale
 loadModule("Main.lua")
