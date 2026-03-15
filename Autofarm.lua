@@ -97,10 +97,24 @@ function AutofarmPro.GetTargetData()
     return target
 end
 
--- [[ BOUCLE PRINCIPALE ]] --
+local FarmToggle = Tabs.Main:AddToggle("AutoFarm", {Title = "Activer l'Autofarm", Default = false })
+
+FarmToggle:OnChanged(function()
+    _G.AutoFarmEnabled = Options.AutoFarm.Value
+    if _G.AutoFarmEnabled then
+        -- Vérification de sécurité avant lancement
+        if _G.AutofarmPro and _G.AutofarmPro.Start then
+            _G.AutofarmPro.Start()
+        else
+            warn("⚠️ ***[YUUSCRIPT] : Moteur AutofarmPro non prêt !***")
+        end
+    end
+end)
+
+-- [[ 2. MOTEUR DE COMBAT (FONCTION START FUSIONNÉE) ]] --
 function AutofarmPro.Start()
     if not _G.AutoFarmEnabled then return end
-    Log("⚔️", "Lancement du cycle de combat...")
+    print("⚔️ ***[YUUSCRIPT] : Lancement du cycle de combat...***")
 
     task.spawn(function()
         while _G.AutoFarmEnabled do
@@ -110,17 +124,26 @@ function AutofarmPro.Start()
                 if not root then return end
                 
                 local targetData = AutofarmPro.GetTargetData()
-                local pGui = Player:FindFirstChild("PlayerGui")
                 
-                -- Vérification si une quête est déjà active
-                local hasQuest = pGui.Main.Quest.Visible and pGui.Main.Quest.Container.QuestTitle.Text ~= ""
+                -- [[ DÉTECTION DE QUÊTE SÉCURISÉE FUSIONNÉE ]] --
+                local pGui = Player:FindFirstChild("PlayerGui")
+                local questFrame = pGui and pGui:FindFirstChild("Main") and pGui.Main:FindFirstChild("Quest")
+                local hasQuest = false
+
+                if questFrame and questFrame.Visible then
+                    local titleObj = questFrame.Container:FindFirstChild("QuestTitle")
+                    -- On vérifie si l'objet existe ET si c'est bien un texte pour éviter les erreurs
+                    if titleObj and (titleObj:IsA("TextLabel") or titleObj:IsA("TextBox")) then
+                        if titleObj.Text ~= "" then
+                            hasQuest = true
+                        end
+                    end
+                end
+                -- [[ FIN DÉTECTION SÉCURISÉE ]] --
 
                 if not hasQuest then
                     -- ÉTAPE 1 : PRENDRE LA QUÊTE
                     Stabilize(root, false)
-                    Log("📍", "Déplacement vers le PNJ : " .. targetData.NPC)
-                    
-                    -- Téléportation/Tween vers le PNJ
                     root.CFrame = targetData.Pos
                     task.wait(0.5)
                     Remote:InvokeServer("StartQuest", targetData.Name, targetData.QuestID)
@@ -132,10 +155,10 @@ function AutofarmPro.Start()
                         Stabilize(root, true)
                         EquipWeapon()
                         
-                        -- Positionnement stratégique (Au-dessus de la cible)
+                        -- Positionnement stratégique au-dessus de la cible
                         root.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 20, 0) * CFrame.Angles(math.rad(-90), 0, 0)
                         
-                        -- Simulation de clic pour attaquer
+                        -- Simulation d'attaque
                         VirtualUser:CaptureController()
                         VirtualUser:Button1Down(Vector2.new(0,0))
                     else
@@ -146,11 +169,11 @@ function AutofarmPro.Start()
                 end
             end)
             
-            if not success then warn("Erreur Moteur : " .. err) end
-            task.wait() -- Boucle rapide pour la réactivité
+            if not success then warn("❌ ***Erreur Moteur : " .. err .. "***") end
+            task.wait() 
         end
         
-        -- Nettoyage à l'arrêt
+        -- Nettoyage automatique à l'arrêt
         if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
             Stabilize(Player.Character.HumanoidRootPart, false)
         end
