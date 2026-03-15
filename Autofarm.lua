@@ -119,9 +119,41 @@ local function EquipWeapon()
     end
 end
 
+-- [[ RECHERCHE CIBLÉE ET PROXIMITÉ ]] --
+local function GetClosestMob(targetName)
+    local closestMob = nil
+    local shortestDistance = math.huge
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if not root then return nil end
+
+    for _, mob in pairs(workspace.Enemies:GetChildren()) do
+        -- 1. FILTRAGE STRICT : Le nom doit être EXACTEMENT targetName
+        if mob.Name == targetName then
+            local hum = mob:FindFirstChild("Humanoid")
+            local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+            
+            -- 2. VALIDATION : Le mob doit exister et être en vie (> 0 HP)
+            if hum and mobRoot and hum.Health > 0 then
+                
+                -- 3. PROXIMITÉ : Calcul de la distance (Magnitude)
+                local distance = (mobRoot.Position - root.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestMob = mob
+                end
+            end
+        end
+    end
+    
+    return closestMob
+end
+
 function AutofarmPro.Start()
     _G.AutoFarmEnabled = true
-    
+    Log("🚀", "***Machine à États lancée !*** Démarrage de la boucle de combat.")
+
     task.spawn(function()
         while _G.AutoFarmEnabled do
             local success, err = pcall(function()
@@ -129,41 +161,48 @@ function AutofarmPro.Start()
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if not root then return end
 
-                local currentTarget = AutofarmPro.GetTargetData() -- Utilise ta table QuestsData
+                local currentTarget = AutofarmPro.GetTargetData()
 
-                -- ÉTAPE : VÉRIFICATION QUÊTE
                 if not GetActiveQuest() then
-                    -- TP NPC et Acceptation
+                    -- Prise de Quête
                     _G.TweenModule.MoveTo(currentTarget.Pos, _G.TweenSpeed).Completed:Wait()
-                    
-                    -- L'ID "1" correspond souvent au Mob A, "2" au Mob B, etc.
-                    -- On s'assure d'invoquer la quête précise définie dans QuestsData
                     game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("StartQuest", currentTarget.Name, 1)
                     task.wait(0.5)
-                else
-                    -- ÉTAPE : COMBAT CIBLÉ
-                    EquipWeapon() -- On s'assure d'avoir l'arme en main
+                elseif CheckHealth() then
+                    
+                    -- ÉTAPE : COMBAT CIBLÉ AVEC FILTRE STRICT 🎯
+                    EquipWeapon() 
+                    
+                    -- Appel de notre nouvelle fonction de sécurité
+                    local targetMob = GetClosestMob(currentTarget.Mob)
 
-                    local mob = nil
-                    -- On cherche UNIQUEMENT le mob défini dans QuestsData pour ce palier
-                    for _, v in pairs(workspace.Enemies:GetChildren()) do
-                        -- Condition STRICTE : Nom du mob EXACT et Vie > 0
-                        if v.Name == currentTarget.Mob and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-                            mob = v
-                            break
-                        end
-                    end
-
-                    if mob and mob:FindFirstChild("HumanoidRootPart") then
-                        -- TP sécurisé au-dessus du mob spécifique
-                        root.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 30, 0)
+                    if targetMob then
+                        local mobRoot = targetMob:FindFirstChild("HumanoidRootPart")
                         
-                        -- Commande d'attaque (VirtualUser pour simuler le clic)
+                        -- Log visuel de la cible verrouillée
+                        -- print("🎯 [YUUSCRIPT] Cible Verrouillée : " .. targetMob.Name .. " | HP: " .. math.floor(targetMob.Humanoid.Health))
+                        
+                        -- TP Sécurisé et Frappe
+                        root.CFrame = mobRoot.CFrame * CFrame.new(0, 30, 0)
+                        
                         game:GetService("VirtualUser"):CaptureController()
                         game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
+                    else
+                        -- Si aucun mob exact n'est trouvé en vie, on retourne au spawn du NPC pour attendre le respawn
+                        -- print("⏳ [YUUSCRIPT] Aucun " .. currentTarget.Mob .. " en vie. Attente du respawn...")
+                        _G.TweenModule.MoveTo(currentTarget.Pos, _G.TweenSpeed)
                     end
+                else
+                    -- Repli tactique si PV faibles
+                    root.CFrame = root.CFrame * CFrame.new(0, 100, 0)
+                    task.wait(2)
                 end
             end)
+
+            if not success then
+                warn("⚠️ Erreur de Boucle Autofarm : " .. tostring(err))
+                task.wait(1)
+            end
             task.wait()
         end
     end)
