@@ -13,6 +13,7 @@ local Fluent = SafeLoad("https://github.com/dawid-scripts/Fluent/releases/latest
 if not Fluent then return end -- Arrêt si Fluent ne charge pas
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+local AutofarmLogic = loadstring(game:HttpGet("https://raw.githubusercontent.com/YuumaBoyz/YUUSCRIPT/main/Autofarm.lua"))()
 
 -- [[ 1. CONFIGURATION ET VARIABLES GLOBALES ]] --
 _G.AutoFarmEnabled = false
@@ -229,8 +230,8 @@ Tabs.Main:AddDropdown("WeaponDropdown", {
 
 Tabs.Main:AddToggle("AutoFarm", {Title = "Activer l'Autofarm", Default = false }):OnChanged(function()
     _G.AutoFarmEnabled = Fluent.Options.AutoFarm.Value
-    if _G.AutoFarmEnabled then 
-        AutofarmPro.Start() 
+    if _G.AutoFarmEnabled then
+        AutofarmLogic.Start() -- On appelle la fonction du module !
     end
 end)
 
