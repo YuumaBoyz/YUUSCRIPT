@@ -137,7 +137,7 @@ end
 -- [[ BOUCLE PRINCIPALE DE L'AUTOFARM ]] --
 function AutofarmPro.Start()
     _G.AutoFarmEnabled = true
-    Log("🚀", "***Machine à États lancée !*** Système de ciblage strict activé.")
+    Log("🚀", "***Machine à États lancée !*** Système de combat Turbo activé.")
 
     task.spawn(function()
         while _G.AutoFarmEnabled do
@@ -148,47 +148,45 @@ function AutofarmPro.Start()
 
                 local currentTarget = AutofarmPro.GetTargetData()
 
-                -- ÉTAPE 1 : GESTION DE LA QUÊTE
+                -- [[ ÉTAPE 1 : GESTION DE LA QUÊTE ]] --
                 if not GetActiveQuest() then
-                    -- On annule tout mouvement en cours
-                    if Tween.Stop then Tween.Stop() end 
+                    if _G.TweenModule and _G.TweenModule.Stop then _G.TweenModule.Stop() end 
                     
-                    -- Déplacement vers le PNJ
                     _G.TweenModule.MoveTo(currentTarget.Pos, _G.TweenSpeed).Completed:Wait()
                     
-                    -- 🔧 LE CORRECTIF EST ICI : On utilise currentTarget.QuestID !
+                    -- Synchronisation avec le QuestID pour éviter de farmer le mauvais mob
                     Remote:InvokeServer("StartQuest", currentTarget.Name, currentTarget.QuestID)
                     task.wait(0.5)
 
-                -- ÉTAPE 2 : VÉRIFICATION SANTÉ
+                -- [[ ÉTAPE 2 : VÉRIFICATION SANTÉ ]] --
                 elseif not CheckHealth() then
-                    Log("🛡️", "***Repli Tactique.*** PV bas.")
-                    root.CFrame = root.CFrame * CFrame.new(0, 150, 0) -- On monte dans le ciel
-                    task.wait(2) -- On attend la régénération
+                    Log("🛡️", "***Repli Tactique.*** Régénération en cours...")
+                    root.CFrame = root.CFrame * CFrame.new(0, 150, 0) 
+                    task.wait(2)
 
-                -- ÉTAPE 3 : COMBAT
+                -- [[ ÉTAPE 3 : COMBAT & FAST ATTACK ]] --
                 else
                     EquipWeapon()
                     
-                    -- On cherche le mob PARFAIT autour de la zone de la quête
                     local targetMob = GetClosestMob(currentTarget.Mob, currentTarget.Pos)
 
                     if targetMob then
                         local mobRoot = targetMob:FindFirstChild("HumanoidRootPart")
                         
-                        -- TP au-dessus et verrouillage de la vue vers le bas (CFrame.Angles)
-                        -- Cela garantit que la hitbox de ton arme touche toujours.
+                        -- Verrouillage de la position 25 studs au-dessus avec angle d'attaque
+                        root.Velocity = Vector3.new(0, 0, 0)
                         root.CFrame = mobRoot.CFrame * CFrame.new(0, 25, 0) * CFrame.Angles(math.rad(-90), 0, 0)
                         
-                        -- Verrouillage de la position pour empêcher les ennemis de te pousser
-                        root.Velocity = Vector3.new(0, 0, 0)
-
-                        -- Spam Clic Brutal
-                        VirtualUser:CaptureController()
-                        VirtualUser:Button1Down(Vector2.new(0, 0))
+                        -- 🔥 EXÉCUTION DE L'ATTAQUE 🔥
+                        if _G.FastAttack then
+                            _G.FastAttack.Attack()
+                        else
+                            -- Fallback au clic classique si le module est absent
+                            game:GetService("VirtualUser"):CaptureController()
+                            game:GetService("VirtualUser"):Button1Down(Vector2.new(0, 0))
+                        end
                     else
-                        -- Si aucun monstre EXACT n'est trouvé, on attend au point de spawn.
-                        -- Finis les dérives aléatoires sur la carte !
+                        -- Si le mob est mort ou absent, on attend au spawn pour éviter de dériver
                         _G.TweenModule.MoveTo(currentTarget.Pos, _G.TweenSpeed)
                     end
                 end
@@ -196,10 +194,9 @@ function AutofarmPro.Start()
 
             if not success then
                 warn("⚠️ Erreur Autofarm: " .. tostring(err))
-                task.wait(1) -- Pause de sécurité en cas d'erreur moteur
+                task.wait(1) 
             end
             
-            -- Délai ultra-court pour maximiser les TPS (Ticks Per Second)
             task.wait() 
         end
     end)
