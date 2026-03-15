@@ -2,23 +2,106 @@ local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
--- [[ CONFIGURATION INITIALE ]] --
-_G.TweenSpeed = 300 -- Vitesse optimisée
+-- [[ 1. CONFIGURATION INITIALE ]] --
+_G.TweenSpeed = 300
 _G.AutoFarmEnabled = false
 _G.SniperEnabled = false
 _G.FruitESP = false
 _G.AntiAFK = true
-_G.BypassGates = true -- Nouveau
-_G.SafeMode = false    -- Nouveau (Arrêt si Admin/Hunter proche)
+_G.BypassGates = true
+_G.SafeMode = false
 _G.SelectedWeapon = "Combat"
 
--- [[ FONCTION SERVER HOP ]] --
+local Player = game.Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- [[ 2. MOTEUR D'AUTOFARM ]] --
+local AutofarmPro = {}
+local QuestsData = {
+    -- Start Island
+    {Level = 0, NPC = "Bandit Quest Giver", Name = "BanditQuest1", Mob = "Bandit", QuestID = 1, Pos = CFrame.new(1059, 16, 1549)},
+    
+    -- Jungle
+    {Level = 10, NPC = "Adventurer", Name = "JungleQuest", Mob = "Monkey", QuestID = 1, Pos = CFrame.new(-1610, 37, 153)},
+    {Level = 15, NPC = "Adventurer", Name = "JungleQuest", Mob = "Gorilla", QuestID = 2, Pos = CFrame.new(-1610, 37, 153)},
+    
+    -- Pirate Village
+    {Level = 30, NPC = "Quest Giver", Name = "PirateVillageQuest", Mob = "Pirate", QuestID = 1, Pos = CFrame.new(-1922, 5, 3918)},
+    {Level = 45, NPC = "Quest Giver", Name = "PirateVillageQuest", Mob = "Brute", QuestID = 2, Pos = CFrame.new(-1922, 5, 3918)},
+    
+    -- Desert
+    {Level = 60, NPC = "Desert Adventurer", Name = "DesertQuest", Mob = "Desert Bandit", QuestID = 1, Pos = CFrame.new(896, 6, 4390)},
+    {Level = 75, NPC = "Desert Adventurer", Name = "DesertQuest", Mob = "Desert Officer", QuestID = 2, Pos = CFrame.new(896, 6, 4390)},
+    
+    -- Frozen Village
+    {Level = 90, NPC = "Snow Adventurer", Name = "SnowQuest", Mob = "Snow Bandit", QuestID = 1, Pos = CFrame.new(1385, 15, -1303)},
+    {Level = 100, NPC = "Snow Adventurer", Name = "SnowQuest", Mob = "Snowman", QuestID = 2, Pos = CFrame.new(1385, 15, -1303)},
+    {Level = 105, NPC = "Snow Adventurer", Name = "SnowQuest", Mob = "Yeti", QuestID = 3, Pos = CFrame.new(1385, 15, -1303)},
+    
+    -- Marine Fortress
+    {Level = 120, NPC = "Marine Quest Giver", Name = "MarineQuest1", Mob = "Chief Petty Officer", QuestID = 1, Pos = CFrame.new(-4840, 22, 4350)},
+    {Level = 150, NPC = "Marine Quest Giver", Name = "MarineQuest1", Mob = "Warden", QuestID = 2, Pos = CFrame.new(-4840, 22, 4350)},
+    {Level = 190, NPC = "Marine Quest Giver", Name = "MarineQuest1", Mob = "Chief Warden", QuestID = 3, Pos = CFrame.new(-4840, 22, 4350)},
+    {Level = 210, NPC = "Marine Quest Giver", Name = "MarineQuest1", Mob = "Swan", QuestID = 4, Pos = CFrame.new(-4840, 22, 4350)},
+    
+    -- Skylands (Lower)
+    {Level = 225, NPC = "Sky Adventurer", Name = "SkyQuest", Mob = "Sky Bandit", QuestID = 1, Pos = CFrame.new(-1240, 357, -5912)},
+    {Level = 250, NPC = "Sky Adventurer", Name = "SkyQuest", Mob = "Dark Steward", QuestID = 2, Pos = CFrame.new(-1240, 357, -5912)},
+    
+    -- Prison (Swan is handled in Marine Fortress usually, but if staying here:)
+    {Level = 190, NPC = "Marine Quest Giver", Name = "MarineQuest1", Mob = "Chief Warden", QuestID = 3, Pos = CFrame.new(-4840, 22, 4350)},
+    
+    -- Magma Village
+    {Level = 300, NPC = "Magma Adventurer", Name = "MagmaQuest", Mob = "Military Soldier", QuestID = 1, Pos = CFrame.new(-5315, 12, 8517)},
+    {Level = 330, NPC = "Magma Adventurer", Name = "MagmaQuest", Mob = "Military Spy", QuestID = 2, Pos = CFrame.new(-5315, 12, 8517)},
+    
+    -- Underwater City
+    {Level = 375, NPC = "Fishman Adventurer", Name = "FishmanQuest", Mob = "Fishman Warrior", QuestID = 1, Pos = CFrame.new(61122, 18, 1568)},
+    {Level = 400, NPC = "Fishman Adventurer", Name = "FishmanQuest", Mob = "Fishman Commando", QuestID = 2, Pos = CFrame.new(61122, 18, 1568)},
+    
+    -- Skylands (Upper)
+    {Level = 450, NPC = "Sky Quest Giver", Name = "SkyQuest2", Mob = "God's Guard", QuestID = 1, Pos = CFrame.new(-4721, 845, -9012)},
+    {Level = 475, NPC = "Sky Quest Giver", Name = "SkyQuest2", Mob = "Shanda", QuestID = 2, Pos = CFrame.new(-4721, 845, -9012)},
+    {Level = 525, NPC = "Sky Quest Giver", Name = "SkyQuest2", Mob = "Royal Squad", QuestID = 3, Pos = CFrame.new(-4721, 845, -9012)},
+    {Level = 550, NPC = "Sky Quest Giver", Name = "SkyQuest2", Mob = "Royal Soldier", QuestID = 4, Pos = CFrame.new(-4721, 845, -9012)},
+    
+    -- Fountain City
+    {Level = 625, NPC = "Cyborg Quest Giver", Name = "FountainQuest", Mob = "Galley Pirate", QuestID = 1, Pos = CFrame.new(5259, 38, 4050)},
+    {Level = 650, NPC = "Cyborg Quest Giver", Name = "FountainQuest", Mob = "Galley Captain", QuestID = 2, Pos = CFrame.new(5259, 38, 4050)},
+}
+
+function AutofarmPro.GetTargetData()
+    local lvl = Player.Data.Level.Value
+    local target = QuestsData[1]
+    for _, data in ipairs(QuestsData) do
+        if lvl >= data.Level then target = data end
+    end
+    return target
+end
+
+function AutofarmPro.Start()
+    _G.AutoFarmEnabled = true
+    task.spawn(function()
+        while _G.AutoFarmEnabled do
+            pcall(function()
+                local target = AutofarmPro.GetTargetData()
+                -- Ta logique de combat et tween ici
+                print("***Farming: " .. target.Mob .. "*** ⚔️")
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
+_G.AutofarmPro = AutofarmPro -- Enregistrement global immédiat
+
+-- [[ 3. FONCTIONS UTILITAIRES ]] --
 local function ServerHop()
     local HttpService = game:GetService("HttpService")
     local TeleportService = game:GetService("TeleportService")
     local PlaceId = game.PlaceId
     local Servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-    
     for _, s in pairs(Servers.data) do
         if s.playing < s.maxPlayers and s.id ~= game.JobId then
             TeleportService:TeleportToPlaceInstance(PlaceId, s.id)
@@ -27,27 +110,25 @@ local function ServerHop()
     end
 end
 
--- [[ PROTECTION ANTI-AFK ]] --
 if _G.AntiAFK then
     local VirtualUser = game:GetService("VirtualUser")
-    game.Players.LocalPlayer.Idled:Connect(function()
+    Player.Idled:Connect(function()
         VirtualUser:CaptureController()
         VirtualUser:ClickButton2(Vector2.new())
     end)
 end
 
--- [[ CRÉATION DE LA FENÊTRE ]] --
+-- [[ 4. INTERFACE GRAPHIQUE (FLUENT) ]] --
 local Window = Fluent:CreateWindow({
-    Title = "YUUSCRIPT 🚀 V3.0",
-    SubTitle = "By YUUMA - Ultimate Blox Fruits",
+    Title = "YUUSCRIPT",
+    SubTitle = "By YUUMA - Fix Edition",
     TabWidth = 160,
-    Size = UDim2.fromOffset(580, 520), -- Légèrement plus grand pour les nouvelles options
+    Size = UDim2.fromOffset(580, 520),
     Acrylic = true,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl
 })
 
--- [[ ONGLETS ]] --
 local Tabs = {
     Main = Window:AddTab({ Title = "Autofarm", Icon = "swords" }),
     Items = Window:AddTab({ Title = "Items & Fruits", Icon = "apple" }),
@@ -58,159 +139,36 @@ local Tabs = {
 
 local Options = Fluent.Options
 
--- [[ 1. SECTION AUTOFARM ]] --
-Tabs.Main:AddParagraph({
-    Title = "Gestion du Farm Sea 1",
-    Content = "Le farm utilise désormais le système de Bypass Gates."
-})
+-- SECTION MAIN
+Tabs.Main:AddParagraph({Title = "Gestion du Farm Sea 1", Content = "Le farm utilise désormais le système de Bypass Gates."})
 
--- SÉLECTEUR D'ARME AMÉLIORÉ
-local WeaponDropdown = Tabs.Main:AddDropdown("WeaponDropdown", {
+Tabs.Main:AddDropdown("WeaponDropdown", {
     Title = "Arme à utiliser",
-    Description = "L'arme sera équipée automatiquement avant chaque combat.",
-    Values = {"Combat", "Saber", "Pipe", "Katana", "Cutlass", "Dual Katana", "Iron Mace", "Soul Cane", "Bisentor"},
+    Values = {"Combat", "Saber", "Pipe", "Katana", "Cutlass", "Dual Katana", "Iron Mace"},
     Default = "Combat",
-    Callback = function(Value)
-        _G.SelectedWeapon = Value
-    end
+    Callback = function(Value) _G.SelectedWeapon = Value end
 })
 
-local FarmToggle = Tabs.Main:AddToggle("AutoFarm", {Title = "Activer l'Autofarm Global", Default = false })
-
+local FarmToggle = Tabs.Main:AddToggle("AutoFarm", {Title = "Activer l'Autofarm", Default = false })
 FarmToggle:OnChanged(function()
     _G.AutoFarmEnabled = Options.AutoFarm.Value
     if _G.AutoFarmEnabled then
-        task.spawn(function()
-            if _G.AutofarmPro then
-                _G.AutofarmPro.Start() 
-            else
-                Fluent:Notify({Title = "⚠️ Erreur", Content = "Module Autofarm Pro (Sea 1) non détecté !"})
-            end
-        end)
+        if _G.AutofarmPro and _G.AutofarmPro.Start then
+            _G.AutofarmPro.Start()
+        else
+            warn("***Erreur : AutofarmPro non prêt !***")
+        end
     end
 end)
 
 Tabs.Main:AddSlider("TweenSpeed", {
     Title = "Vitesse de Vol",
-    Description = "300 recommandé pour la Sea 1.",
-    Default = 300,
-    Min = 50,
-    Max = 800,
-    Rounding = 1,
-    Callback = function(Value)
-        _G.TweenSpeed = Value
-    end
+    Default = 300, Min = 50, Max = 800, Rounding = 1,
+    Callback = function(Value) _G.TweenSpeed = Value end
 })
 
--- NOUVELLE SECTION PHYSIQUE
-Tabs.Main:AddParagraph({ Title = "Options de Physique" })
+-- SECTION PHYSIQUE
+Tabs.Main:AddToggle("BypassGates", {Title = "Bypass Gates", Default = true}):OnChanged(function(v) _G.BypassGates = v end)
 
-Tabs.Main:AddToggle("BypassGates", {Title = "Bypass Gates (Traverser Portes)", Default = true}):OnChanged(function(v)
-    _G.BypassGates = v
-end)
-
-Tabs.Main:AddToggle("SafeMode", {Title = "Safe Mode (Anti-Admin/Bounty)", Default = false}):OnChanged(function(v)
-    _G.SafeMode = v
-    if v then
-        task.spawn(function()
-            while _G.SafeMode do
-                for _, p in pairs(game.Players:GetPlayers()) do
-                    if p ~= game.Players.LocalPlayer and p:GetRoleInGroup(2830838) ~= "Guest" then -- Détecte les staffs
-                        _G.AutoFarmEnabled = false
-                        Options.AutoFarm:SetValue(false)
-                        Fluent:Notify({Title = "🚨 ALERT", Content = "Admin détecté ! Farm stoppé."})
-                        break
-                    end
-                end
-                task.wait(2)
-            end
-        end)
-    end
-end)
-
--- [[ 2. SECTION SNIPER FRUIT ]] --
-Tabs.Items:AddParagraph({
-    Title = "Inventaire & Fruits",
-    Content = "Le sniper récolte et stocke automatiquement."
-})
-
-local SniperToggle = Tabs.Items:AddToggle("FruitSniper", {Title = "Activer Fruit Sniper Pro", Default = false })
-
-SniperToggle:OnChanged(function()
-    _G.SniperEnabled = Options.FruitSniper.Value
-    if _G.SniperEnabled then
-        task.spawn(function()
-            while _G.SniperEnabled do
-                if _G.FruitSniper then
-                    pcall(function() _G.FruitSniper.CheckAndCollect() end)
-                end
-                task.wait(1.5)
-            end
-        end)
-    end
-end)
-
--- [[ 3. SECTION VISUELS ]] --
-local ESPToggle = Tabs.Visuals:AddToggle("FruitESP", {Title = "ESP Fruits", Default = false })
-
-ESPToggle:OnChanged(function()
-    _G.FruitESP = Options.FruitESP.Value
-    task.spawn(function()
-        while _G.FruitESP do
-            if _G.Visuals then _G.Visuals.UpdateESP(true) end
-            task.wait(3)
-        end
-        if _G.Visuals then _G.Visuals.UpdateESP(false) end
-    end)
-end)
-
-Tabs.Visuals:AddToggle("FullBright", {Title = "Lumière Infinie", Default = false }):OnChanged(function(Value)
-    if Value then
-        game:GetService("Lighting").Brightness = 2
-        game:GetService("Lighting").ClockTime = 14
-        game:GetService("Lighting").FogEnd = 100000
-    else
-        game:GetService("Lighting").Brightness = 1
-    end
-end)
-
--- [[ 4. SECTION SERVEUR & MISC ]] --
-Tabs.Misc:AddButton({
-    Title = "Server Hop (Rapide)",
-    Description = "Idéal pour chercher des coffres ou fruits.",
-    Callback = function()
-        Window:Dialog({
-            Title = "Changer de serveur ?",
-            Content = "Voulez-vous chercher un nouveau serveur public ?",
-            Buttons = {
-                { Title = "Oui", Callback = function() ServerHop() end },
-                { Title = "Annuler" }
-            }
-        })
-    end
-})
-
-Tabs.Misc:AddToggle("AntiAFK_Toggle", {Title = "Protection Anti-AFK", Default = true}):OnChanged(function(v)
-    _G.AntiAFK = v
-end)
-
--- [[ 5. PARAMÈTRES SYSTÈME ]] --
-Tabs.Settings:AddButton({
-    Title = "Détruire l'Interface",
-    Callback = function() Window:Destroy() end
-})
-
--- [[ FINALISATION ]] --
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.Settings)
-
-Window:SelectTab(1)
-Fluent:Notify({
-    Title = "YUUSCRIPT V3.0 CHARGÉ",
-    Content = "Farming Sea 1 prêt avec " .. _G.SelectedWeapon .. " !",
-    Duration = 5
-})
+-- SECTION MISC & VISUALS
+Tabs.Visuals:AddToggle
